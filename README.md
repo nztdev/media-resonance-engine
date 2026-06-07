@@ -1,1 +1,1 @@
-# multimedia-resonance-engine
+# media-resonance-engine
