@@ -81,14 +81,18 @@
       <circle cx="140" cy="140" r="70"  fill="none" stroke="rgba(201,169,110,0.20)" stroke-width="1"/>
       <circle cx="140" cy="140" r="50"  fill="url(#orbGrad)"/>
       <!-- Rotating arcs -->
-     <g id="rotArc" style="transform-origin:140px 140px;animation:spin 8s linear infinite">
-        <path d="M 140 10 A 130 130 0 0 1 270 140" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1" stroke-linecap="round"/>
-        <circle cx="270" cy="140" r="3" fill="#C9A96E"/>
-      </g>
-      <g id="rotArcInner" style="transform-origin:140px 140px;animation:spin 5s linear infinite reverse">
-        <path d="M 140 70 A 70 70 0 0 1 210 140" fill="none" stroke="rgba(201,169,110,0.35)" stroke-width="1" stroke-linecap="round"/>
-        <circle cx="210" cy="140" r="2.5" fill="#C9A96E" opacity="0.7"/>
-      </g>
+     <g id="rotArc">
+  <animateTransform attributeName="transform" type="rotate"
+    from="0 140 140" to="360 140 140" dur="8s" repeatCount="indefinite"/>
+  <path d="M 140 10 A 130 130 0 0 1 270 140" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1" stroke-linecap="round"/>
+  <circle cx="270" cy="140" r="3" fill="#C9A96E"/>
+</g>
+<g id="rotArcInner">
+  <animateTransform attributeName="transform" type="rotate"
+    from="360 140 140" to="0 140 140" dur="5s" repeatCount="indefinite"/>
+  <path d="M 140 70 A 70 70 0 0 1 210 140" fill="none" stroke="rgba(201,169,110,0.35)" stroke-width="1" stroke-linecap="round"/>
+  <circle cx="210" cy="140" r="2.5" fill="#C9A96E" opacity="0.7"/>
+</g>
       <!-- Hz display -->
       <text id="orbHz" x="140" y="134" text-anchor="middle" font-family="'DM Mono'" font-size="24" font-weight="300" fill="#C9A96E">432</text>
       <text x="140" y="152" text-anchor="middle" font-family="'DM Mono'" font-size="9" letter-spacing="4" fill="rgba(201,169,110,0.5)">HZ</text>
