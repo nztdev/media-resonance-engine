@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<!--
+  Media Resonance Engine · v0.3
+  Repository: https://github.com/[your-username]/media-resonance-engine
+  Deployed via: GitHub Pages (root / main branch)
+
+  Architecture:
+    assets/css/         — design system (tokens · layout · components · animations)
+    assets/js/core/     — pure functions · zero DOM · React Native portable
+    assets/js/ui/       — DOM rendering layer · calls core via state only
+    assets/js/state/    — MREState coordinator · single source of truth
+    assets/js/main.js   — entry point · init · event bindings
+    assets/data/        — frequencies.json · media-types.json
+    modules/            — ecosystem plugin folders
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Media Resonance Engine — Frequency alignment for every medium. Tune your audio, video, image and text to natural resonance frequencies.">
+  <meta name="version" content="0.3">
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="Media Resonance Engine — I'm Tuned!">
+  <meta property="og:description" content="Frequency alignment for every medium. Tune your content to 432Hz and beyond.">
+  <meta property="og:type"        content="website">
+
+  <title>Media Resonance Engine — I'm Tuned!</title>
+
+  <!-- Design system CSS -->
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/animations.css">
+</head>
+<body>
+
+<!-- ── Ambient glows ── -->
+<div class="ambient ambient-1"></div>
+<div class="ambient ambient-2"></div>
+<div class="ambient ambient-3"></div>
+
+<!-- ── Navigation ── -->
+<nav>
+  <a class="nav-logo" href="#">Media Resonance <span>·</span> Engine</a>
+  <ul class="nav-links">
+    <li><a href="#tuned">I'm Tuned!</a></li>
+    <li><a href="#science">The Science</a></li>
+    <li><a href="#ecosystem">Ecosystem</a></li>
+    <li><a href="#waitlist">Early Access</a></li>
+  </ul>
+  <button class="nav-cta" onclick="document.getElementById('waitlist').scrollIntoView({behavior:'smooth'})">
+    Request Access
+  </button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- HERO -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-eyebrow">Media Resonance Engine — Flagship Release</div>
+
+  <!-- Frequency orb -->
+  <div class="freq-orb" style="width:280px;height:280px;position:relative;margin:0 auto 3rem;">
+    <svg viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+      <defs>
+        <radialGradient id="orbGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#C9A96E" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#C9A96E" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <!-- Intensity ring (driven by OrbUI.updateIntensityRing) -->
+      <circle id="intensityRing" cx="140" cy="140" r="120"
+        fill="none" stroke="#C9A96E" stroke-width="1.5"
+        stroke-dasharray="754" stroke-dashoffset="188"
+        stroke-linecap="round" opacity="0.4"
+        transform="rotate(-90 140 140)"/>
+      <!-- Static rings -->
+      <circle cx="140" cy="140" r="110" fill="none" stroke="rgba(201,169,110,0.12)" stroke-width="0.5"/>
+      <circle cx="140" cy="140" r="90"  fill="none" stroke="rgba(201,169,110,0.16)" stroke-width="0.5"/>
+      <circle cx="140" cy="140" r="70"  fill="none" stroke="rgba(201,169,110,0.20)" stroke-width="1"/>
+      <circle cx="140" cy="140" r="50"  fill="url(#orbGrad)"/>
+      <!-- Rotating arcs -->
+      <g id="rotArc">
+        <path d="M 140 10 A 130 130 0 0 1 270 140" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1" stroke-linecap="round"/>
+        <circle cx="270" cy="140" r="3" fill="#C9A96E"/>
+      </g>
+      <g id="rotArcInner">
+        <path d="M 140 70 A 70 70 0 0 1 210 140" fill="none" stroke="rgba(201,169,110,0.35)" stroke-width="1" stroke-linecap="round"/>
+        <circle cx="210" cy="140" r="2.5" fill="#C9A96E" opacity="0.7"/>
+      </g>
+      <!-- Hz display -->
+      <text id="orbHz" x="140" y="134" text-anchor="middle" font-family="'DM Mono'" font-size="24" font-weight="300" fill="#C9A96E">432</text>
+      <text x="140" y="152" text-anchor="middle" font-family="'DM Mono'" font-size="9" letter-spacing="4" fill="rgba(201,169,110,0.5)">HZ</text>
+      <!-- Tick marks -->
+      <g stroke="rgba(201,169,110,0.25)" stroke-width="0.5">
+        <line x1="140" y1="10"  x2="140" y2="20"/>
+        <line x1="140" y1="260" x2="140" y2="270"/>
+        <line x1="10"  y1="140" x2="20"  y2="140"/>
+        <line x1="260" y1="140" x2="270" y2="140"/>
+      </g>
+    </svg>
+  </div>
+
+  <h1 class="hero-title">Every frequency<br>tells a <em>story.</em></h1>
+  <p class="hero-subtitle">We help yours resonate.</p>
+  <p class="hero-desc">The Media Resonance Engine transforms any audio, video, or image into its highest-frequency expression — restoring coherence, clarity, and energetic alignment to your content.</p>
+
+  <div class="hero-actions">
+    <button class="btn-primary" onclick="document.getElementById('tuned').scrollIntoView({behavior:'smooth'})">
+      Try I'm Tuned! →
+    </button>
+    <button class="btn-secondary" onclick="document.getElementById('science').scrollIntoView({behavior:'smooth'})">
+      The Science
+    </button>
+  </div>
+
+  <div class="scroll-indicator">
+    <span class="scroll-text">Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<hr class="hr">
+
+<!-- ── Stat bar ── -->
+<section style="padding:3rem 2rem;border-bottom:0.5px solid var(--border)">
+  <div class="section-inner">
+    <div class="stat-row">
+      <div><div class="stat-num">432</div><div class="stat-label">Default Tuning (Hz)</div></div>
+      <div><div class="stat-num">6</div><div class="stat-label">Solfège Frequencies</div></div>
+      <div><div class="stat-num">∞</div><div class="stat-label">Media Types Supported</div></div>
+      <div><div class="stat-num">100%</div><div class="stat-label">Original Quality Preserved</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- I'M TUNED! — FLAGSHIP MODULE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="tuned">
+  <div class="section-inner">
+    <div class="section-eyebrow">Flagship Module</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1.5rem">
+      <div>
+        <h2 class="section-title">I'm <em>Tuned!</em></h2>
+        <p class="section-body">Upload any media. Select your resonance frequency. Receive a harmonically realigned version that breathes with natural coherence.</p>
+      </div>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        Live · v0.3
+      </div>
+    </div>
+
+    <!-- Pipeline -->
+    <div class="pipeline">
+      <div class="pipeline-step"><div class="pipeline-num">01</div><div class="pipeline-title">Ingest</div><div class="pipeline-body">Upload any media type</div></div>
+      <div class="pipeline-step"><div class="pipeline-num">02</div><div class="pipeline-title">Analyse</div><div class="pipeline-body">Spectral resonance mapping</div></div>
+      <div class="pipeline-step"><div class="pipeline-num">03</div><div class="pipeline-title">Align</div><div class="pipeline-body">Harmonic frequency tuning</div></div>
+      <div class="pipeline-step"><div class="pipeline-num">04</div><div class="pipeline-title">Render</div><div class="pipeline-body">Lossless resonance output</div></div>
+      <div class="pipeline-step"><div class="pipeline-num">05</div><div class="pipeline-title">Verify</div><div class="pipeline-body">A/B coherence report</div></div>
+    </div>
+
+    <div class="tuned-grid">
+      <!-- ── Input panel ── -->
+      <div class="tuned-panel">
+        <div class="panel-label">
+          <span>Media Input</span>
+          <span id="fileStatus" style="color:var(--gold);font-size:0.6rem"></span>
+        </div>
+
+        <!-- Upload zone -->
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          </div>
+          <p class="upload-text"><strong>Drop your media here</strong> or click to browse</p>
+          <p class="upload-hint" id="uploadHint">Audio · Video · Image · PDF · Text</p>
+          <div class="media-chips">
+            <button class="chip active" data-type="audio">Audio</button>
+            <button class="chip"        data-type="video">Video</button>
+            <button class="chip"        data-type="image">Image</button>
+            <button class="chip"        data-type="pdf">PDF</button>
+            <button class="chip"        data-type="text">Text</button>
+            <button class="chip"        data-type="stream">Stream URL</button>
+          </div>
+        </div>
+        <input type="file" id="fileInput" style="display:none" accept="audio/*">
+
+        <!-- Frequency selector -->
+        <div class="freq-selector">
+          <div class="freq-label">Target Resonance Frequency</div>
+          <div class="freq-grid" id="freqGrid">
+            <button class="freq-btn selected" data-hz="432" tabindex="0">
+              <span class="freq-hz">432</span><span class="freq-name">Verdi's A</span>
+            </button>
+            <button class="freq-btn" data-hz="528" tabindex="0">
+              <span class="freq-hz">528</span><span class="freq-name">Love / DNA</span>
+            </button>
+            <button class="freq-btn" data-hz="396" tabindex="0">
+              <span class="freq-hz">396</span><span class="freq-name">Liberation</span>
+            </button>
+            <button class="freq-btn" data-hz="639" tabindex="0">
+              <span class="freq-hz">639</span><span class="freq-name">Connection</span>
+            </button>
+            <button class="freq-btn" data-hz="741" tabindex="0">
+              <span class="freq-hz">741</span><span class="freq-name">Awakening</span>
+            </button>
+            <button class="freq-btn" data-hz="963" tabindex="0">
+              <span class="freq-hz">963</span><span class="freq-name">Unity</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Intensity -->
+        <div style="margin-top:1.25rem">
+          <div class="freq-label" style="display:flex;justify-content:space-between">
+            <span>Alignment Intensity</span>
+            <span id="intensityVal" style="color:var(--gold)">72%</span>
+          </div>
+          <input type="range" min="10" max="100" value="72" id="intensitySlider"
+            style="width:100%;accent-color:var(--gold);margin-top:0.5rem">
+        </div>
+
+        <button class="process-btn" id="processBtn" onclick="MREState.startProcessing()">
+          Align to Resonance →
+        </button>
+      </div>
+
+      <!-- ── Output panel ── -->
+      <div class="tuned-panel">
+        <div class="panel-label">
+          <span>Resonance Output</span>
+          <span id="outputStatus" style="color:var(--text-muted);font-size:0.55rem">Awaiting input</span>
+        </div>
+
+        <!-- Processing state -->
+        <div class="processing-state" id="processingState">
+          <div class="resonance-circle">
+            <svg viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(201,169,110,0.15)" stroke-width="1"/>
+              <path d="M 40 5 A 35 35 0 0 1 75 40" fill="none" stroke="#C9A96E" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="40" cy="40" r="4" fill="rgba(201,169,110,0.3)"/>
+              <circle cx="40" cy="40" r="2" fill="#C9A96E"/>
+            </svg>
+          </div>
+          <div class="processing-text">Tuning to <span id="processingHz">432</span>Hz</div>
+          <div class="processing-stage" id="processingStage">Analysing spectral content...</div>
+          <div style="margin-top:1.5rem">
+            <div class="meter-row"><span class="meter-label" style="width:120px">Spectral Map</span><div class="meter-bar"><div class="meter-fill" id="pBar1" style="width:0%"></div></div></div>
+            <div class="meter-row"><span class="meter-label" style="width:120px">Harmonic Align</span><div class="meter-bar"><div class="meter-fill" id="pBar2" style="width:0%"></div></div></div>
+            <div class="meter-row"><span class="meter-label" style="width:120px">Coherence Check</span><div class="meter-bar"><div class="meter-fill" id="pBar3" style="width:0%"></div></div></div>
+          </div>
+        </div>
+
+        <!-- Result state -->
+        <div id="resultState">
+          <svg class="waveform-visual" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg" id="waveformSvg">
+            <rect width="400" height="80" fill="rgba(255,255,255,0.02)" rx="4"/>
+          </svg>
+
+          <div class="ab-toggle">
+            <button class="ab-btn active" id="btnA" onclick="MREState.setABMode('A')">A · Original</button>
+            <button class="ab-btn"        id="btnB" onclick="MREState.setABMode('B')">B · Tuned</button>
+          </div>
+
+          <div class="resonance-meter">
+            <div style="font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.75rem">Resonance Analysis</div>
+            <div class="meter-row"><span class="meter-label">Harmonic</span><div class="meter-bar"><div class="meter-fill" id="mHarmonic"></div></div><span class="meter-val" id="vHarmonic">—</span></div>
+            <div class="meter-row"><span class="meter-label">Coherence</span><div class="meter-bar"><div class="meter-fill" id="mCoherence"></div></div><span class="meter-val" id="vCoherence">—</span></div>
+            <div class="meter-row"><span class="meter-label">Clarity</span><div class="meter-bar"><div class="meter-fill" id="mClarity"></div></div><span class="meter-val" id="vClarity">—</span></div>
+            <div class="meter-row"><span class="meter-label">Alignment</span><div class="meter-bar"><div class="meter-fill" id="mAlignment"></div></div><span class="meter-val" id="vAlignment">—</span></div>
+          </div>
+
+          <div id="uploadPrompt">
+            <p style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">
+              Upload media and align<br>to see resonance output here
+            </p>
+          </div>
+
+          <div class="download-row" id="downloadRow" style="display:none">
+            <button class="dl-btn">WAV Lossless</button>
+            <button class="dl-btn">MP3 320k</button>
+            <button class="dl-btn gold">Full Report</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SCIENCE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="science" style="border-top:0.5px solid var(--border)">
+  <div class="section-inner">
+    <div class="section-eyebrow">The Science</div>
+    <div class="freq-science">
+      <div>
+        <h2 class="section-title">Frequencies <em>matter</em><br>at every scale.</h2>
+        <p class="section-body" style="margin-bottom:1.5rem">All matter vibrates. All media carries frequency. The Media Resonance Engine applies harmonic alignment derived from ancient solfège and modern bioacoustics to ensure your content resonates at its most coherent expression.</p>
+        <p class="section-body">Whether you're a musician aligning to 432Hz, a filmmaker calibrating your visual narrative, or a brand ensuring your assets vibrate with your audience — the engine handles the physics while you focus on the story.</p>
+      </div>
+      <div>
+        <div class="freq-label" style="margin-bottom:1rem">Solfège Frequency Map · click to select</div>
+        <table class="freq-table" id="freqTable">
+          <tr class="active-freq" data-hz="432" onclick="MREState.selectFreqFromTable(this)"><td>432 Hz</td><td>Verdi's A · Natural tuning · Earth resonance</td><td>🟡</td></tr>
+          <tr data-hz="528"  onclick="MREState.selectFreqFromTable(this)"><td>528 Hz</td><td>Love frequency · DNA repair · Transformation</td><td></td></tr>
+          <tr data-hz="396"  onclick="MREState.selectFreqFromTable(this)"><td>396 Hz</td><td>Liberation from fear · Grounding · UT</td><td></td></tr>
+          <tr data-hz="417"  onclick="MREState.selectFreqFromTable(this)"><td>417 Hz</td><td>Facilitating change · Clearing negativity</td><td></td></tr>
+          <tr data-hz="639"  onclick="MREState.selectFreqFromTable(this)"><td>639 Hz</td><td>Connection · Relationships · FA</td><td></td></tr>
+          <tr data-hz="741"  onclick="MREState.selectFreqFromTable(this)"><td>741 Hz</td><td>Awakening intuition · SOL</td><td></td></tr>
+          <tr data-hz="852"  onclick="MREState.selectFreqFromTable(this)"><td>852 Hz</td><td>Return to spiritual order · LA</td><td></td></tr>
+          <tr data-hz="963"  onclick="MREState.selectFreqFromTable(this)"><td>963 Hz</td><td>Divine consciousness · Unity · SI</td><td></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="explanation-grid reveal">
+      <div class="explain-card"><div class="explain-num">I</div><div class="explain-title">Spectral Analysis</div><div class="explain-body">Every piece of media is decomposed into its constituent frequency components via multi-resolution spectral mapping — revealing the precise harmonic signature embedded within.</div></div>
+      <div class="explain-card"><div class="explain-num">II</div><div class="explain-title">Harmonic Alignment</div><div class="explain-body">The engine applies proprietary resonance shifting — adjusting pitch ratios, tonal relationships, and phase coherence to lock the content into its target solfège frequency.</div></div>
+      <div class="explain-card"><div class="explain-num">III</div><div class="explain-title">Coherence Verification</div><div class="explain-body">A full A/B resonance report compares original vs. tuned output across four dimensions: harmonic integrity, phase coherence, tonal clarity, and alignment fidelity.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Manifesto ── -->
+<section style="border-top:0.5px solid var(--border);padding:5rem 2rem">
+  <div class="manifesto reveal">
+    <div class="manifesto-quote">"The universe is not made of matter. It is made of music."</div>
+    <div class="manifesto-line"></div>
+    <div class="manifesto-attr">Media Resonance Engine · Design Principle</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ECOSYSTEM -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="ecosystem" style="border-top:0.5px solid var(--border)">
+  <div class="section-inner">
+    <div class="section-eyebrow">The Ecosystem</div>
+    <h2 class="section-title">Every medium.<br><em>One engine.</em></h2>
+    <p class="section-body">The Media Resonance Engine is a complete media transformation platform. I'm Tuned! is live. The rest of the ecosystem is in development.</p>
+
+    <div class="ecosystem-grid">
+      <div class="eco-card flagship">
+        <div class="eco-icon"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+        <div class="eco-title">I'm Tuned!</div>
+        <div class="eco-body">Universal frequency alignment for audio, video, image, and text media. The flagship converter.</div>
+        <div class="eco-tag" style="color:var(--gold)">↑ Active · Try now</div>
+      </div>
+      <div class="eco-card">
+        <div class="eco-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+        <div class="eco-title">Frame Resonance</div>
+        <div class="eco-body">Apply frequency alignment to raw video footage — colour, sound, and narrative harmonised.</div>
+        <div class="eco-tag">Visual Media · In Development</div>
+      </div>
+      <div class="eco-card">
+        <div class="eco-icon"><svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="eco-title">Script Alignment</div>
+        <div class="eco-body">Analyse the resonant frequency of written content and restructure for harmonic coherence.</div>
+        <div class="eco-tag">Written Media · In Development</div>
+      </div>
+      <div class="eco-card">
+        <div class="eco-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+        <div class="eco-title">Live Stream Tuner</div>
+        <div class="eco-body">Real-time frequency alignment for live audio and video streams. Every moment, in resonance.</div>
+        <div class="eco-tag">Live Media · Planned</div>
+      </div>
+      <div class="eco-card">
+        <div class="eco-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div>
+        <div class="eco-title">Brand Resonance</div>
+        <div class="eco-body">Map the complete frequency signature of your brand assets and align everything to a unified harmonic identity.</div>
+        <div class="eco-tag">Brand Media · Planned</div>
+      </div>
+      <div class="eco-card">
+        <div class="eco-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div class="eco-title">Resonance API</div>
+        <div class="eco-body">Integrate harmonic frequency alignment directly into your production pipeline. REST + WebSocket.</div>
+        <div class="eco-tag">Developer Access · Planned</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- WAITLIST -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="waitlist">
+  <div class="section-inner">
+    <div class="waitlist-inner">
+      <div class="section-eyebrow" style="justify-content:center">Early Access</div>
+      <h2 class="section-title" style="text-align:center">Tune in <em>first.</em></h2>
+      <p class="section-body" style="margin:0 auto;text-align:center">Join the early access list for the full Media Resonance Engine ecosystem. Priority access, founding pricing, and direct input on the roadmap.</p>
+      <div class="email-form">
+        <input type="email" class="email-input" placeholder="your@email.com" id="emailInput">
+        <button class="email-submit">Request Access</button>
+      </div>
+      <p class="waitlist-note">No spam. No noise. Just signal. · Unsubscribe anytime.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="footer-logo">Media Resonance Engine</div>
+  <ul class="footer-links">
+    <li><a href="#">Privacy</a></li>
+    <li><a href="#">Terms</a></li>
+    <li><a href="#">Contact</a></li>
+    <li><a href="#">API Docs</a></li>
+  </ul>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem">
+    <div class="footer-copy">© 2025 Media Resonance Engine · All frequencies reserved.</div>
+    <div class="version-tag-footer">
+      v0.3 · <a href="https://github.com/[your-username]/media-resonance-engine" target="_blank">
+        github.com/media-resonance-engine
+      </a>
+    </div>
+  </div>
+</footer>
+
+<!-- ── Success overlay ── -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card" onclick="event.stopPropagation()">
+    <div class="success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="success-title">You're on the list.</div>
+    <div class="success-body">We'll be in touch with early access details. Expect signal — not noise.</div>
+    <button class="btn-primary" style="width:100%;margin-top:0.5rem"
+      onclick="document.getElementById('successOverlay').classList.remove('active')">Close</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SCRIPTS — core first, then ui, then state, then main      -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- Core: pure functions, zero DOM -->
+<script src="assets/js/core/fft-utils.js"></script>
+<script src="assets/js/core/frequency-engine.js"></script>
+<script src="assets/js/core/resonance-analyser.js"></script>
+<script src="assets/js/core/module-registry.js"></script>
+
+<!-- UI: DOM renderers -->
+<script src="assets/js/ui/ui.js"></script>
+<script src="assets/js/ui/orb.js"></script>
+<script src="assets/js/ui/waveform.js"></script>
+
+<!-- State: coordinator -->
+<script src="assets/js/state/mre-state.js"></script>
+
+<!-- Entry point -->
+<script src="assets/js/main.js"></script>
+
+</body>
+</html>

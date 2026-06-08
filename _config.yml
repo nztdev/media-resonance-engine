@@ -1,0 +1,16 @@
+# Media Resonance Engine · GitHub Pages config
+# https://github.com/[your-username]/media-resonance-engine
+
+title:       Media Resonance Engine
+description: Frequency alignment for every medium
+url:         https://[your-username].github.io
+baseurl:     /media-resonance-engine
+
+# No Jekyll theme — pure static HTML
+theme: null
+
+# Exclude dev files from build
+exclude:
+  - README.md
+  - "*.sh"
+  - node_modules
