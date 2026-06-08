@@ -38,15 +38,6 @@
   to { transform: rotate(360deg); }
 }
 
-#rotArc {
-  transform-origin: 140px 140px;
-  animation: spin 8s linear infinite;
-}
-#rotArcInner {
-  transform-origin: 140px 140px;
-  animation: spin 5s linear infinite reverse;
-}
-
 /* ── Glow pulse ── */
 @keyframes pulseGlow {
   0%, 100% { opacity: 0.5; }
