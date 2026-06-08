@@ -1,0 +1,107 @@
+{
+  "frequencies": [
+    {
+      "hz": 396,
+      "name": "Liberation",
+      "solfege": "UT",
+      "description": "Liberation from fear · Grounding · Foundation",
+      "properties": {
+        "tradition": "Solfège",
+        "associatedWith": ["fear release", "grounding", "security"],
+        "colorHex": "#6B7FA3"
+      },
+      "inGrid": false
+    },
+    {
+      "hz": 417,
+      "name": "Change",
+      "solfege": "RE",
+      "description": "Facilitating change · Clearing negativity · Transition",
+      "properties": {
+        "tradition": "Solfège",
+        "associatedWith": ["change", "clearing", "transition"],
+        "colorHex": "#8B9E7A"
+      },
+      "inGrid": false
+    },
+    {
+      "hz": 432,
+      "name": "Verdi's A",
+      "solfege": "A",
+      "description": "Natural tuning · Earth resonance · Schumann harmonic",
+      "properties": {
+        "tradition": "Natural tuning",
+        "associatedWith": ["nature", "harmony", "earth", "mathematical beauty"],
+        "colorHex": "#C9A96E",
+        "isDefault": true
+      },
+      "inGrid": true
+    },
+    {
+      "hz": 528,
+      "name": "Love / DNA",
+      "solfege": "MI",
+      "description": "Love frequency · DNA repair · Transformation",
+      "properties": {
+        "tradition": "Solfège",
+        "associatedWith": ["love", "transformation", "DNA repair", "miracles"],
+        "colorHex": "#A07BC8"
+      },
+      "inGrid": true
+    },
+    {
+      "hz": 639,
+      "name": "Connection",
+      "solfege": "FA",
+      "description": "Connection · Relationships · Communication",
+      "properties": {
+        "tradition": "Solfège",
+        "associatedWith": ["connection", "relationships", "communication", "harmony"],
+        "colorHex": "#7BA8C8"
+      },
+      "inGrid": true
+    },
+    {
+      "hz": 741,
+      "name": "Awakening",
+      "solfege": "SOL",
+      "description": "Awakening intuition · Expression · Solutions",
+      "properties": {
+        "tradition": "Solfège",
+        "associatedWith": ["intuition", "expression", "problem solving"],
+        "colorHex": "#C8A07B"
+      },
+      "inGrid": true
+    },
+    {
+      "hz": 852,
+      "name": "Spiritual",
+      "solfege": "LA",
+      "description": "Return to spiritual order · Inner strength",
+      "properties": {
+        "tradition": "Solfège",
+        "associatedWith": ["spiritual order", "inner strength", "intuition"],
+        "colorHex": "#9BC87B"
+      },
+      "inGrid": false
+    },
+    {
+      "hz": 963,
+      "name": "Unity",
+      "solfege": "SI",
+      "description": "Divine consciousness · Unity · Crown frequency",
+      "properties": {
+        "tradition": "Solfège",
+        "associatedWith": ["divine consciousness", "unity", "crown chakra"],
+        "colorHex": "#C8C87B"
+      },
+      "inGrid": true
+    }
+  ],
+  "defaultHz": 432,
+  "standardTuning": 440,
+  "meta": {
+    "version": "0.3",
+    "note": "This file is shared between web and native platforms. Do not add DOM-specific properties."
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "mediaTypes": [
+    {
+      "id": "audio",
+      "label": "Audio",
+      "accept": "audio/*",
+      "extensions": ["mp3", "wav", "flac", "aac", "ogg", "m4a", "aiff"],
+      "maxMB": 50,
+      "hint": "MP3, WAV, FLAC, AAC, OGG · up to 50MB",
+      "processingEngine": "webAudio",
+      "outputFormats": ["wav", "mp3"],
+      "available": true
+    },
+    {
+      "id": "video",
+      "label": "Video",
+      "accept": "video/*",
+      "extensions": ["mp4", "mov", "avi", "mkv", "webm"],
+      "maxMB": 200,
+      "hint": "MP4, MOV, AVI, MKV · up to 200MB",
+      "processingEngine": "webAudio",
+      "outputFormats": ["mp4"],
+      "available": true,
+      "note": "Audio track extracted and processed — video frames unchanged until v0.7 Frame Resonance"
+    },
+    {
+      "id": "image",
+      "label": "Image",
+      "accept": "image/*",
+      "extensions": ["jpg", "jpeg", "png", "webp", "tiff", "bmp"],
+      "maxMB": 25,
+      "hint": "JPG, PNG, WEBP, TIFF · up to 25MB",
+      "processingEngine": "canvas",
+      "outputFormats": ["png", "jpg"],
+      "available": true
+    },
+    {
+      "id": "pdf",
+      "label": "PDF",
+      "accept": "application/pdf",
+      "extensions": ["pdf"],
+      "maxMB": 25,
+      "hint": "PDF documents · up to 25MB",
+      "processingEngine": "text",
+      "outputFormats": ["pdf", "txt"],
+      "available": true
+    },
+    {
+      "id": "text",
+      "label": "Text",
+      "accept": "text/*,.txt,.md,.doc,.docx",
+      "extensions": ["txt", "md", "doc", "docx", "rtf"],
+      "maxMB": 999,
+      "hint": "TXT, MD, DOC, DOCX · any size",
+      "processingEngine": "text",
+      "outputFormats": ["txt", "md"],
+      "available": true
+    },
+    {
+      "id": "stream",
+      "label": "Stream URL",
+      "accept": "",
+      "extensions": [],
+      "maxMB": 0,
+      "hint": "Paste a URL to process a live or hosted stream",
+      "processingEngine": "stream",
+      "outputFormats": [],
+      "available": false,
+      "comingSoon": true
+    }
+  ],
+  "meta": {
+    "version": "0.3",
+    "note": "This file is shared between web and native platforms. processingEngine values map to platform-specific implementations."
+  }
+}

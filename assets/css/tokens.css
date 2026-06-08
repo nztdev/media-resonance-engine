@@ -1,0 +1,117 @@
+/* ═══════════════════════════════════════════════════════════
+   MEDIA RESONANCE ENGINE · tokens.css
+   Design system — single source of truth for all visual values
+   v0.3 · https://github.com/[your-username]/media-resonance-engine
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Instrument+Sans:wght@300;400;500&display=swap');
+
+/* ── Colour palette ── */
+:root {
+  /* Gold scale */
+  --gold:          #C9A96E;
+  --gold-dim:      #8A6D3F;
+  --gold-pale:     #F5EDD8;
+  --fog:           rgba(201, 169, 110, 0.12);
+  --fog-strong:    rgba(201, 169, 110, 0.22);
+
+  /* Ink scale */
+  --ink:           #0A0906;
+  --ink-mid:       #1C180F;
+  --ink-soft:      #2E2A1E;
+
+  /* Parchment scale */
+  --parchment:     #F8F4EC;
+  --cream:         #EDE8DC;
+
+  /* Text scale */
+  --text-primary:   #1C180F;
+  --text-secondary: #5C5440;
+  --text-muted:     #9B9078;
+
+  /* Borders */
+  --border:        rgba(201, 169, 110, 0.25);
+  --border-strong: rgba(201, 169, 110, 0.50);
+
+  /* Semantic */
+  --success:       #4A9B6F;
+  --warning:       #C9A96E;
+  --error:         rgba(200, 80, 80, 0.8);
+
+  /* ── Typography ── */
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-mono:    'DM Mono', 'Courier New', monospace;
+  --font-body:    'Instrument Sans', system-ui, sans-serif;
+
+  /* ── Spacing ── */
+  --space-xs:  0.25rem;
+  --space-sm:  0.5rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* ── Radii ── */
+  --radius:    4px;
+  --radius-lg: 10px;
+
+  /* ── Transitions ── */
+  --transition:      0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Z-index scale ── */
+  --z-base:    1;
+  --z-above:   10;
+  --z-nav:     100;
+  --z-overlay: 200;
+  --z-toast:   300;
+}
+
+/* ── Base reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--ink);
+  color: var(--parchment);
+  font-family: var(--font-body);
+  font-weight: 300;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Focus styles ── */
+:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(201, 169, 110, 0.25);
+  color: var(--parchment);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(201, 169, 110, 0.2);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 169, 110, 0.4);
+}

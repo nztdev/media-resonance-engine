@@ -1,0 +1,126 @@
+/* ═══════════════════════════════════════════════════════════
+   MEDIA RESONANCE ENGINE · animations.css
+   Keyframes · entrance animations · reveal system · motion
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Entrance animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Ambient drift ── */
+@keyframes drift1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(60px, 40px) scale(1.1); }
+}
+@keyframes drift2 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-40px, -60px) scale(0.9); }
+}
+
+.ambient-1 { animation: drift1 18s ease-in-out infinite alternate; }
+.ambient-2 { animation: drift2 22s ease-in-out infinite alternate; }
+.ambient-3 { animation: pulseGlow 8s ease-in-out infinite; }
+
+/* ── Orb rotation ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#rotArc {
+  transform-origin: 140px 140px;
+  animation: spin 8s linear infinite;
+}
+#rotArcInner {
+  transform-origin: 140px 140px;
+  animation: spin 5s linear infinite reverse;
+}
+
+/* ── Glow pulse ── */
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
+/* ── Status dot pulse ── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.85); }
+}
+.status-dot { animation: pulse 2s ease-in-out infinite; }
+
+/* ── Processing spinner ── */
+@keyframes processSpin {
+  to { transform: rotate(360deg); }
+}
+.resonance-circle svg { animation: processSpin 3s linear infinite; }
+
+/* ── Processing text pulse ── */
+.processing-text { animation: pulse 2s ease-in-out infinite; }
+
+/* ── Scroll indicator ── */
+@keyframes scrollPulse {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 1; }
+}
+.scroll-line { animation: scrollPulse 2s ease-in-out infinite; }
+
+/* ── Upload zone nudge ── */
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+.upload-zone.nudge { animation: nudge 0.4s ease; border-color: rgba(201,169,110,0.7) !important; }
+
+/* ── Hero staggered entrance ── */
+.hero-eyebrow { animation: fadeUp 1s ease forwards 0.3s; opacity: 0; }
+.hero-title    { animation: fadeUp 1s ease forwards 0.5s; opacity: 0; }
+.hero-subtitle { animation: fadeUp 1s ease forwards 0.7s; opacity: 0; }
+.hero-desc     { animation: fadeUp 1s ease forwards 0.9s; opacity: 0; }
+.hero-actions  { animation: fadeUp 1s ease forwards 1.1s; opacity: 0; }
+.freq-orb      { animation: fadeIn 1.5s ease forwards 1.3s; opacity: 0; }
+
+.scroll-indicator { animation: fadeIn 1s ease forwards 2s; opacity: 0; }
+
+/* ── Scroll reveal ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Success card entrance ── */
+.success-card { animation: fadeUp 0.5s ease; }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
