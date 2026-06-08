@@ -4,7 +4,7 @@
 
 A free, open-source tool for tuning audio, video, image, and text to natural resonance frequencies. Hosted permanently on GitHub Pages. No server. No cost. No paywalls.
 
-→ **[Live site](https://[your-username].github.io/media-resonance-engine)**
+→ **[Live site](https://nztdev.github.io/media-resonance-engine)**
 
 ---
 
@@ -114,7 +114,7 @@ npx serve .
 
 1. Push this repo to GitHub
 2. Settings → Pages → Source: `Deploy from branch` → Branch: `main` → Folder: `/ (root)`
-3. Live at `https://[your-username].github.io/media-resonance-engine` within 60 seconds
+3. Live at `https://nztdev.github.io/media-resonance-engine` within 60 seconds
 4. Tag each version: `git tag v0.3 && git push origin v0.3`
 
 ---
