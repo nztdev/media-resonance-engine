@@ -1,4 +1,10 @@
 /**
+ * MEDIA RESONANCE ENGINE · ui/ui.js
+ * MetersUI · NavUI · ToastUI · UploadUI · FileReaderUI
+ * DOM layer — v0.4
+ */
+
+/**
  * MEDIA RESONANCE ENGINE · ui/meters.js
  * Resonance meter bar animations — DOM only.
  * v0.3
@@ -242,4 +248,288 @@ const UploadUI = (() => {
   }
 
   return { init, setLoaded, nudge, setAccept, setHint };
+})();
+
+
+/**
+ * MEDIA RESONANCE ENGINE · ui/file-reader.js (embedded in ui.js)
+ * ──────────────────────────────────────────────────────────────
+ * Reads files using browser APIs (FileReader, AudioContext, Canvas).
+ * Returns plain data objects — no DOM references in the result.
+ * DOM layer only. Called by mre-state.js via onFileLoaded().
+ *
+ * v0.4
+ */
+const FileReaderUI = (() => {
+
+  // ── Audio reading ─────────────────────────────────────────
+  /**
+   * Read an audio file and return decoded audio data.
+   * Uses Web Audio API — browser only.
+   *
+   * @param {File} file
+   * @returns {Promise<AudioReadResult>}
+   *   { channelData: Float32Array[], sampleRate, duration,
+   *     numberOfChannels, fileName, fileSizeMB }
+   */
+  async function readAudio(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        try {
+          // AudioContext must be created in UI layer — not portable to RN
+          const ctx         = new (window.AudioContext || window.webkitAudioContext)();
+          const arrayBuffer = e.target.result;
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+          // Extract channel data as plain arrays (portable)
+          const channelData = [];
+          for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+            // Copy — don't hold reference to AudioBuffer after context closes
+            channelData.push(new Float32Array(audioBuffer.getChannelData(i)));
+          }
+
+          await ctx.close();
+
+          resolve({
+            type:             'audio',
+            channelData,
+            sampleRate:       audioBuffer.sampleRate,
+            duration:         audioBuffer.duration,
+            numberOfChannels: audioBuffer.numberOfChannels,
+            fileName:         file.name,
+            fileSizeMB:       file.size / 1024 / 1024,
+          });
+        } catch (err) {
+          reject(new Error(`Audio decode failed: ${err.message}`));
+        }
+      };
+
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // ── Image reading ─────────────────────────────────────────
+  /**
+   * Read an image file and return pixel data via Canvas.
+   * @param {File} file
+   * @returns {Promise<ImageReadResult>}
+   *   { imageData: ImageData, width, height, dominantHue,
+   *     saturation, brightness, colourVariance, fileName, fileSizeMB }
+   */
+  async function readImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+
+      img.onload = () => {
+        try {
+          // Downsample to max 200x200 for fast pixel analysis
+          const maxDim = 200;
+          const scale  = Math.min(maxDim / img.width, maxDim / img.height, 1);
+          const w      = Math.round(img.width  * scale);
+          const h      = Math.round(img.height * scale);
+
+          const canvas = document.createElement('canvas');
+          canvas.width  = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const imageData = ctx.getImageData(0, 0, w, h);
+          const analysis  = _analysePixels(imageData);
+
+          URL.revokeObjectURL(url);
+
+          resolve({
+            type:          'image',
+            imageData,
+            width:         img.width,
+            height:        img.height,
+            fileName:      file.name,
+            fileSizeMB:    file.size / 1024 / 1024,
+            ...analysis,
+          });
+        } catch (err) {
+          reject(new Error(`Image read failed: ${err.message}`));
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Image load failed'));
+      };
+
+      img.src = url;
+    });
+  }
+
+  /**
+   * Analyse pixel data to extract colour frequency metrics.
+   * Pure computation on raw pixel values.
+   * @param {ImageData} imageData
+   * @returns {{ dominantHue, saturation, brightness, colourVariance }}
+   */
+  function _analysePixels(imageData) {
+    const data       = imageData.data;
+    const pixelCount = data.length / 4;
+    let   rSum = 0, gSum = 0, bSum = 0;
+    const hues = [];
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i] / 255;
+      const g = data[i + 1] / 255;
+      const b = data[i + 2] / 255;
+      rSum += r; gSum += g; bSum += b;
+
+      // RGB → HSL hue
+      const max  = Math.max(r, g, b);
+      const min  = Math.min(r, g, b);
+      const delta = max - min;
+      if (delta > 0.05) { // ignore near-grey pixels
+        let h = 0;
+        if      (max === r) h = ((g - b) / delta) % 6;
+        else if (max === g) h = (b - r) / delta + 2;
+        else                h = (r - g) / delta + 4;
+        hues.push((h * 60 + 360) % 360);
+      }
+    }
+
+    const avgR = rSum / pixelCount;
+    const avgG = gSum / pixelCount;
+    const avgB = bSum / pixelCount;
+
+    // Average brightness (0–100)
+    const brightness = Math.round(((avgR + avgG + avgB) / 3) * 100);
+
+    // Average saturation proxy
+    const maxAvg = Math.max(avgR, avgG, avgB);
+    const minAvg = Math.min(avgR, avgG, avgB);
+    const saturation = maxAvg > 0
+      ? Math.round(((maxAvg - minAvg) / maxAvg) * 100)
+      : 0;
+
+    // Dominant hue (circular mean)
+    let sinSum = 0, cosSum = 0;
+    hues.forEach(h => {
+      sinSum += Math.sin(h * Math.PI / 180);
+      cosSum += Math.cos(h * Math.PI / 180);
+    });
+    const dominantHue = hues.length > 0
+      ? Math.round((Math.atan2(sinSum / hues.length, cosSum / hues.length) * 180 / Math.PI + 360) % 360)
+      : 0;
+
+    // Colour variance (standard deviation of hues, normalised 0–1)
+    const hueMean = dominantHue;
+    const variance = hues.length > 0
+      ? Math.sqrt(hues.reduce((s, h) => s + Math.pow(h - hueMean, 2), 0) / hues.length) / 180
+      : 0;
+
+    return {
+      dominantHue,
+      saturation,
+      brightness,
+      colourVariance: Math.min(variance, 1),
+    };
+  }
+
+  // ── Text reading ──────────────────────────────────────────
+  /**
+   * Read a text file and return linguistic metrics.
+   * @param {File} file
+   * @returns {Promise<TextReadResult>}
+   */
+  async function readText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        try {
+          const text     = e.target.result;
+          const analysis = _analyseText(text);
+
+          resolve({
+            type:       'text',
+            text,
+            fileName:   file.name,
+            fileSizeMB: file.size / 1024 / 1024,
+            ...analysis,
+          });
+        } catch (err) {
+          reject(new Error(`Text read failed: ${err.message}`));
+        }
+      };
+
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.readAsText(file);
+    });
+  }
+
+  /**
+   * Analyse text to extract resonance metrics.
+   * @param {string} text
+   * @returns {{ wordCount, sentenceCount, avgWordsPerSentence,
+   *             avgSyllablesPerWord, uniqueWordRatio, punctuationDensity }}
+   */
+  function _analyseText(text) {
+    const words      = text.match(/\b\w+\b/g) || [];
+    const sentences  = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const wordCount  = words.length;
+    const sentenceCount = sentences.length;
+
+    const avgWordsPerSentence = sentenceCount > 0
+      ? wordCount / sentenceCount
+      : 0;
+
+    // Simple syllable estimate: vowel groups per word
+    const totalSyllables = words.reduce((sum, w) => {
+      const syllables = (w.toLowerCase().match(/[aeiou]+/g) || []).length;
+      return sum + Math.max(syllables, 1);
+    }, 0);
+    const avgSyllablesPerWord = wordCount > 0 ? totalSyllables / wordCount : 0;
+
+    // Unique word ratio (lexical diversity)
+    const uniqueWords    = new Set(words.map(w => w.toLowerCase()));
+    const uniqueWordRatio = wordCount > 0 ? uniqueWords.size / wordCount : 0;
+
+    // Punctuation density
+    const punctCount      = (text.match(/[.,;:!?'"()\-–—]/g) || []).length;
+    const punctuationDensity = text.length > 0 ? punctCount / text.length : 0;
+
+    return {
+      wordCount,
+      sentenceCount,
+      avgWordsPerSentence:  Math.round(avgWordsPerSentence  * 10) / 10,
+      avgSyllablesPerWord:  Math.round(avgSyllablesPerWord  * 10) / 10,
+      uniqueWordRatio:      Math.round(uniqueWordRatio       * 100) / 100,
+      punctuationDensity:   Math.round(punctuationDensity   * 1000) / 1000,
+    };
+  }
+
+  // ── Router ────────────────────────────────────────────────
+  /**
+   * Read any file based on its declared media type.
+   * @param {File}   file
+   * @param {string} mediaType — 'audio' | 'video' | 'image' | 'text' | 'pdf'
+   * @returns {Promise<ReadResult>}
+   */
+  async function read(file, mediaType) {
+    switch (mediaType) {
+      case 'audio':
+      case 'video':  // extract audio track
+        return readAudio(file);
+      case 'image':
+        return readImage(file);
+      case 'text':
+      case 'pdf':    // PDF text extraction v0.7 — reads as text for now
+        return readText(file);
+      default:
+        return readAudio(file); // best-effort fallback
+    }
+  }
+
+  return { read, readAudio, readImage, readText };
+
 })();

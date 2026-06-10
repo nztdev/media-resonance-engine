@@ -5,26 +5,421 @@
  * Core functions are called here. UI is updated from here.
  * Neither core nor UI know about each other directly.
  *
- * v0.3 · https://github.com/[your-username]/media-resonance-engine
+ * v0.4 · https://github.com/[your-username]/media-resonance-engine
  */
 
 const MREState = (() => {
 
   // ── Application state ─────────────────────────────────────
   const state = {
-    selectedHz:       432,
-    selectedMediaType:'audio',
-    intensity:        72,
-    fileLoaded:       false,
-    fileName:         '',
-    fileSizeMB:       0,
-    fileData:         null,   // Float32Array or other raw data (v0.4+)
-    processed:        false,
-    abMode:           'A',    // 'A' | 'B'
-    originalScores:   null,
-    tunedScores:      null,
-    report:           null,
+    selectedHz:        432,
+    selectedMediaType: 'audio',
+    intensity:         72,
+    fileLoaded:        false,
+    fileName:          '',
+    fileSizeMB:        0,
+    fileData:          null,   // ReadResult from FileReaderUI.read()
+    waveformSamples:   null,   // Float32Array — downsampled for SVG
+    processed:         false,
+    abMode:            'A',
+    originalScores:    null,
+    tunedScores:       null,
+    report:            null,
   };
+
+  // ── Frequency ─────────────────────────────────────────────
+  function setFrequency(hz) {
+    state.selectedHz = hz;
+    OrbUI.updateHz(hz);
+    OrbUI.updateIntensityRing(state.intensity);
+
+    document.querySelectorAll('.freq-btn').forEach(btn => {
+      btn.classList.toggle('selected', parseInt(btn.dataset.hz) === hz);
+    });
+
+    document.querySelectorAll('#freqTable tr').forEach(row => {
+      const rowHz    = parseInt(row.dataset.hz);
+      const isActive = rowHz === hz;
+      row.classList.toggle('active-freq', isActive);
+      const indicator = row.querySelectorAll('td')[2];
+      if (indicator) indicator.textContent = isActive ? '🟡' : '';
+    });
+
+    const procHz = document.getElementById('processingHz');
+    if (procHz) procHz.textContent = hz;
+
+    if (state.processed) _refreshWaveform();
+  }
+
+  // ── Media type ────────────────────────────────────────────
+  function setMediaType(type) {
+    state.selectedMediaType = type;
+
+    document.querySelectorAll('.chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.type === type);
+    });
+
+    const mediaTypes = window._MRE_DATA?.mediaTypes || [];
+    const def        = mediaTypes.find(m => m.id === type);
+    if (def) {
+      UploadUI.setAccept(def.accept);
+      if (!state.fileLoaded) UploadUI.setHint(def.hint);
+    }
+
+    const streamRow = document.getElementById('streamRow');
+    if (streamRow) streamRow.style.display = type === 'stream' ? 'block' : 'none';
+  }
+
+  // ── Intensity ─────────────────────────────────────────────
+  function setIntensity(val) {
+    state.intensity = val;
+    const label = document.getElementById('intensityVal');
+    if (label) label.textContent = val + '%';
+    OrbUI.updateIntensityRing(val);
+    if (state.processed) _refreshWaveform();
+  }
+
+  // ── File loaded ───────────────────────────────────────────
+  async function onFileLoaded(file) {
+    // Size guard
+    const mediaTypes = window._MRE_DATA?.mediaTypes || [];
+    const def        = mediaTypes.find(m => m.id === state.selectedMediaType);
+    const maxMB      = def?.maxMB || 50;
+    const sizeMB     = file.size / 1024 / 1024;
+
+    if (maxMB < 999 && sizeMB > maxMB) {
+      ToastUI.show(`File too large · max ${maxMB}MB for ${state.selectedMediaType}`);
+      return;
+    }
+
+    // Reset state
+    state.fileLoaded       = true;
+    state.fileName         = file.name;
+    state.fileSizeMB       = sizeMB;
+    state.fileData         = null;
+    state.waveformSamples  = null;
+    state.processed        = false;
+    state.originalScores   = null;
+    state.tunedScores      = null;
+
+    UploadUI.setLoaded(file.name, sizeMB);
+    MetersUI.reset();
+    _hideResults();
+    _showMetadata(null); // clear previous metadata
+    WaveformUI.renderGenerated({ tuned: false, hz: state.selectedHz, intensity: state.intensity });
+    ToastUI.show(`Reading ${file.name}...`);
+
+    // ── Real file reading via FileReaderUI ──────────────────
+    try {
+      const result = await FileReaderUI.read(file, state.selectedMediaType);
+      state.fileData = result;
+
+      // Render real waveform for audio
+      if (result.type === 'audio' && result.channelData && result.channelData[0]) {
+        // Downsample channel 0 to 300 points for SVG
+        state.waveformSamples = FFTUtils.downsample(result.channelData[0], 300);
+        WaveformUI.renderFromData(state.waveformSamples, {
+          tuned:     false,
+          hz:        state.selectedHz,
+          intensity: state.intensity,
+        });
+      }
+
+      // Display real metadata
+      _showMetadata(result);
+      ToastUI.show(`${file.name} loaded · ready to align`);
+
+    } catch (err) {
+      console.warn('MRE: file read error —', err.message);
+      // Graceful fallback — generated waveform already shown, continue
+      ToastUI.show(`File loaded · ${err.message.includes('decode') ? 'preview unavailable for this format' : 'ready to align'}`);
+    }
+  }
+
+  // ── Metadata display ──────────────────────────────────────
+  function _showMetadata(result) {
+    const el = document.getElementById('fileMetadata');
+    if (!el) return;
+
+    if (!result) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+    let html = '';
+
+    if (result.type === 'audio') {
+      const dur     = result.duration ? _formatDuration(result.duration) : '—';
+      const rate    = result.sampleRate ? `${(result.sampleRate / 1000).toFixed(1)}kHz` : '—';
+      const ch      = result.numberOfChannels === 1 ? 'Mono' : result.numberOfChannels === 2 ? 'Stereo' : `${result.numberOfChannels}ch`;
+      const sizeMB  = result.fileSizeMB ? `${result.fileSizeMB.toFixed(2)}MB` : '—';
+      html = `
+        <span class="meta-item"><span class="meta-label">Duration</span>${dur}</span>
+        <span class="meta-item"><span class="meta-label">Sample rate</span>${rate}</span>
+        <span class="meta-item"><span class="meta-label">Channels</span>${ch}</span>
+        <span class="meta-item"><span class="meta-label">Size</span>${sizeMB}</span>
+      `;
+    } else if (result.type === 'image') {
+      html = `
+        <span class="meta-item"><span class="meta-label">Dimensions</span>${result.width}×${result.height}px</span>
+        <span class="meta-item"><span class="meta-label">Dominant hue</span>${result.dominantHue}°</span>
+        <span class="meta-item"><span class="meta-label">Saturation</span>${result.saturation}%</span>
+        <span class="meta-item"><span class="meta-label">Brightness</span>${result.brightness}%</span>
+      `;
+    } else if (result.type === 'text') {
+      html = `
+        <span class="meta-item"><span class="meta-label">Words</span>${result.wordCount.toLocaleString()}</span>
+        <span class="meta-item"><span class="meta-label">Sentences</span>${result.sentenceCount.toLocaleString()}</span>
+        <span class="meta-item"><span class="meta-label">Avg sentence</span>${result.avgWordsPerSentence} words</span>
+        <span class="meta-item"><span class="meta-label">Lexical diversity</span>${Math.round(result.uniqueWordRatio * 100)}%</span>
+      `;
+    }
+
+    el.innerHTML  = html;
+    el.style.display = 'flex';
+  }
+
+  function _formatDuration(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function _hideResults() {
+    const dlRow    = document.getElementById('downloadRow');
+    const outStatus = document.getElementById('outputStatus');
+    if (dlRow)     dlRow.style.display    = 'none';
+    if (outStatus) outStatus.textContent  = 'Awaiting processing';
+  }
+
+  // ── Processing ────────────────────────────────────────────
+  function startProcessing() {
+    if (!state.fileLoaded) {
+      UploadUI.nudge();
+      ToastUI.show('Upload a file to begin · or drop one into the zone above');
+      return;
+    }
+
+    const btn = document.getElementById('processBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Aligning...'; }
+
+    const processingEl = document.getElementById('processingState');
+    const promptEl     = document.getElementById('uploadPrompt');
+    const outputStatus = document.getElementById('outputStatus');
+
+    if (processingEl) processingEl.classList.add('active');
+    if (promptEl)     promptEl.style.display  = 'none';
+    if (outputStatus) outputStatus.textContent = `Aligning to ${state.selectedHz}Hz · ${state.intensity}%...`;
+
+    ['pBar1','pBar2','pBar3'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.width = '0%';
+    });
+
+    const stages = [
+      `Analysing ${state.selectedMediaType} spectral content...`,
+      `Mapping harmonic signature...`,
+      `Calculating delta to ${state.selectedHz}Hz...`,
+      `Applying resonance alignment at ${state.intensity}%...`,
+      `Verifying coherence integrity...`,
+      `Rendering tuned output...`,
+    ];
+    let stageIdx = 0;
+    const stageInterval = setInterval(() => {
+      const stageEl = document.getElementById('processingStage');
+      if (stageEl) stageEl.textContent = stages[Math.min(stageIdx, stages.length - 1)];
+      stageIdx++;
+    }, 700);
+
+    const t = (ms, fn) => setTimeout(fn, ms);
+    t(400,  () => { const b = document.getElementById('pBar1'); if(b) b.style.width = '100%'; });
+    t(1500, () => { const b = document.getElementById('pBar2'); if(b) b.style.width = '100%'; });
+    t(2700, () => { const b = document.getElementById('pBar3'); if(b) b.style.width = '100%'; });
+
+    setTimeout(() => {
+      clearInterval(stageInterval);
+      if (processingEl) processingEl.classList.remove('active');
+
+      // v0.5 will compute scores from real file data
+      // For now: generate scores that reflect actual file characteristics
+      const baseScores = _estimateBaseScores();
+      const tuned      = ResonanceAnalyser.applyIntensity(baseScores, state.intensity, state.selectedHz);
+
+      state.originalScores = baseScores;
+      state.tunedScores    = tuned;
+      state.processed      = true;
+      state.abMode         = 'A';
+
+      state.report = ResonanceAnalyser.buildReport({
+        mediaType:      state.selectedMediaType,
+        fileName:       state.fileName,
+        targetHz:       state.selectedHz,
+        intensity:      state.intensity,
+        originalScores: baseScores,
+        tunedScores:    tuned,
+      });
+
+      _showResults();
+      if (btn) { btn.disabled = false; btn.textContent = 'Align to Resonance →'; }
+    }, 4000);
+  }
+
+  /**
+   * Estimate base scores from real file data where available.
+   * Returns plausible scores derived from actual file characteristics.
+   * Full real scoring comes in v0.5.
+   */
+  function _estimateBaseScores() {
+    const data = state.fileData;
+    if (!data) return { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
+
+    if (data.type === 'audio') {
+      // Use RMS amplitude as a proxy for signal quality
+      const rms      = data.channelData ? FFTUtils.rmsAmplitude(data.channelData[0]) : 0.3;
+      const harmonic  = Math.round(40 + rms * 40);
+      const coherence = Math.round(35 + rms * 35);
+      const clarity   = Math.round(50 + rms * 30);
+      const alignment = Math.round(30 + Math.random() * 20); // real FFT analysis in v0.5
+      return { harmonic, coherence, clarity, alignment };
+    }
+
+    if (data.type === 'image') {
+      return ResonanceAnalyser.scoreImage({
+        dominantHue:    data.dominantHue    || 0,
+        saturation:     data.saturation     || 50,
+        brightness:     data.brightness     || 50,
+        colourVariance: data.colourVariance || 0.5,
+        targetHz:       state.selectedHz,
+        intensity:      state.intensity,
+      });
+    }
+
+    if (data.type === 'text') {
+      return ResonanceAnalyser.scoreText({
+        avgSyllablesPerWord:  data.avgSyllablesPerWord  || 1.5,
+        avgWordsPerSentence:  data.avgWordsPerSentence  || 15,
+        uniqueWordRatio:      data.uniqueWordRatio      || 0.5,
+        punctuationDensity:   data.punctuationDensity   || 0.05,
+        intensity:            state.intensity,
+      });
+    }
+
+    return { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
+  }
+
+  function _showResults() {
+    const outStatus = document.getElementById('outputStatus');
+    const dlRow     = document.getElementById('downloadRow');
+    const promptEl  = document.getElementById('uploadPrompt');
+
+    if (outStatus) outStatus.textContent = `Complete · ${state.selectedHz}Hz · ${state.intensity}%`;
+    if (dlRow)     dlRow.style.display   = 'flex';
+    if (promptEl)  promptEl.style.display = 'none';
+
+    MetersUI.setAll(state.originalScores);
+    setABMode('A');
+    ToastUI.show(`Aligned to ${state.selectedHz}Hz · switch to B to compare`);
+  }
+
+  // ── A/B ───────────────────────────────────────────────────
+  function setABMode(mode) {
+    state.abMode = mode;
+    const btnA = document.getElementById('btnA');
+    const btnB = document.getElementById('btnB');
+    if (btnA) btnA.classList.toggle('active', mode === 'A');
+    if (btnB) btnB.classList.toggle('active', mode === 'B');
+
+    if (state.processed) {
+      const scores = mode === 'B' ? state.tunedScores : state.originalScores;
+      MetersUI.setAll(scores);
+      _refreshWaveform();
+    }
+  }
+
+  function _refreshWaveform() {
+    // Use real waveform data if available (audio A state)
+    if (state.waveformSamples && state.abMode === 'A') {
+      WaveformUI.renderFromData(state.waveformSamples, {
+        tuned:     false,
+        hz:        state.selectedHz,
+        intensity: state.intensity,
+      });
+    } else {
+      WaveformUI.renderGenerated({
+        tuned:     state.abMode === 'B',
+        hz:        state.selectedHz,
+        intensity: state.intensity,
+      });
+    }
+  }
+
+  // ── Waitlist ──────────────────────────────────────────────
+  function submitWaitlist() {
+    const input = document.getElementById('emailInput');
+    if (!input) return;
+    const email = input.value.trim();
+    const re    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!re.test(email)) {
+      input.style.borderColor = 'rgba(200,80,80,0.5)';
+      input.focus();
+      setTimeout(() => { input.style.borderColor = ''; }, 1500);
+      ToastUI.show('Please enter a valid email address');
+      return;
+    }
+
+    document.getElementById('successOverlay')?.classList.add('active');
+    input.value = '';
+  }
+
+  // ── Download report ───────────────────────────────────────
+  function downloadReport() {
+    if (!state.report) return;
+    const blob = new Blob([JSON.stringify(state.report, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `mre-report-${state.selectedHz}hz-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Reveal on scroll ──────────────────────────────────────
+  function initReveal() {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  }
+
+  // ── Select freq from table ────────────────────────────────
+  function selectFreqFromTable(row) {
+    const hz = parseInt(row.dataset.hz);
+    if (!hz) return;
+    setFrequency(hz);
+    document.getElementById('tuned')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const freqData = window._MRE_DATA?.frequencies?.find(f => f.hz === hz);
+    ToastUI.show(`Frequency set to ${hz}Hz · ${freqData?.name || ''}`);
+  }
+
+  // ── Public API ────────────────────────────────────────────
+  return {
+    get state() { return state; },
+    setFrequency,
+    setMediaType,
+    setIntensity,
+    onFileLoaded,
+    startProcessing,
+    setABMode,
+    submitWaitlist,
+    downloadReport,
+    initReveal,
+    selectFreqFromTable,
+  };
+
+})();
+
+// Alias for backward-compat with any inline onclick attributes
+const MRE = MREState;
 
   // ── Frequency ─────────────────────────────────────────────
   function setFrequency(hz) {

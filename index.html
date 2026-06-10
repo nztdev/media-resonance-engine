@@ -1,7 +1,8 @@
+
 <!DOCTYPE html>
 <!--
   Media Resonance Engine · v0.3
-  Repository: https://github.com/nztdev/media-resonance-engine
+  Repository: https://github.com/[your-username]/media-resonance-engine
   Deployed via: GitHub Pages (root / main branch)
 
   Architecture:
@@ -18,7 +19,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Media Resonance Engine — Frequency alignment for every medium. Tune your audio, video, image and text to natural resonance frequencies.">
-  <meta name="version" content="0.3">
+  <meta name="version" content="0.4">
+  <style>
+    .meta-item {
+      display:flex; flex-direction:column; gap:0.15rem;
+      color:var(--text-secondary);
+    }
+    .meta-label {
+      font-size:0.55rem; letter-spacing:0.12em;
+      text-transform:uppercase; color:var(--text-muted);
+    }
+  </style>
 
   <!-- Open Graph -->
   <meta property="og:title"       content="Media Resonance Engine — I'm Tuned!">
@@ -81,18 +92,14 @@
       <circle cx="140" cy="140" r="70"  fill="none" stroke="rgba(201,169,110,0.20)" stroke-width="1"/>
       <circle cx="140" cy="140" r="50"  fill="url(#orbGrad)"/>
       <!-- Rotating arcs -->
-     <g id="rotArc">
-  <animateTransform attributeName="transform" type="rotate"
-    from="0 140 140" to="360 140 140" dur="8s" repeatCount="indefinite"/>
-  <path d="M 140 10 A 130 130 0 0 1 270 140" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1" stroke-linecap="round"/>
-  <circle cx="270" cy="140" r="3" fill="#C9A96E"/>
-</g>
-<g id="rotArcInner">
-  <animateTransform attributeName="transform" type="rotate"
-    from="360 140 140" to="0 140 140" dur="5s" repeatCount="indefinite"/>
-  <path d="M 140 70 A 70 70 0 0 1 210 140" fill="none" stroke="rgba(201,169,110,0.35)" stroke-width="1" stroke-linecap="round"/>
-  <circle cx="210" cy="140" r="2.5" fill="#C9A96E" opacity="0.7"/>
-</g>
+      <g id="rotArc">
+        <path d="M 140 10 A 130 130 0 0 1 270 140" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1" stroke-linecap="round"/>
+        <circle cx="270" cy="140" r="3" fill="#C9A96E"/>
+      </g>
+      <g id="rotArcInner">
+        <path d="M 140 70 A 70 70 0 0 1 210 140" fill="none" stroke="rgba(201,169,110,0.35)" stroke-width="1" stroke-linecap="round"/>
+        <circle cx="210" cy="140" r="2.5" fill="#C9A96E" opacity="0.7"/>
+      </g>
       <!-- Hz display -->
       <text id="orbHz" x="140" y="134" text-anchor="middle" font-family="'DM Mono'" font-size="24" font-weight="300" fill="#C9A96E">432</text>
       <text x="140" y="152" text-anchor="middle" font-family="'DM Mono'" font-size="9" letter-spacing="4" fill="rgba(201,169,110,0.5)">HZ</text>
@@ -152,7 +159,7 @@
       </div>
       <div class="status-badge">
         <span class="status-dot"></span>
-        Live · v0.3
+        Live · v0.4
       </div>
     </div>
 
@@ -190,6 +197,20 @@
           </div>
         </div>
         <input type="file" id="fileInput" style="display:none" accept="audio/*">
+
+        <!-- File metadata bar — populated by mre-state.js after real file read -->
+        <div id="fileMetadata" style="
+          display:none;
+          flex-wrap:wrap;
+          gap:0.75rem;
+          margin-top:0.85rem;
+          padding:0.75rem;
+          background:rgba(201,169,110,0.05);
+          border:0.5px solid var(--border);
+          border-radius:var(--radius);
+          font-family:var(--font-mono);
+          font-size:0.62rem;
+        "></div>
 
         <!-- Frequency selector -->
         <div class="freq-selector">
@@ -417,7 +438,7 @@
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem">
     <div class="footer-copy">© 2025 Media Resonance Engine · All frequencies reserved.</div>
     <div class="version-tag-footer">
-      v0.3 · <a href="https://github.com/nztdev/media-resonance-engine" target="_blank">
+      v0.4 · <a href="https://github.com/[your-username]/media-resonance-engine" target="_blank">
         github.com/media-resonance-engine
       </a>
     </div>
