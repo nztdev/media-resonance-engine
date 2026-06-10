@@ -588,6 +588,45 @@ const MREState = (() => {
     a.click();
     URL.revokeObjectURL(url);
   }
+  
+// ── Download WAV ──────────────────────────────────────────
+  function downloadWAV() {
+    if (!state.outputBuffer || !state.outputSampleRate) {
+      ToastUI.show('No audio output available — process an audio file first');
+      return;
+    }
+    const baseName = state.fileName.replace(/\.[^.]+$/, '');
+    const filename = `${baseName}_${state.selectedHz}hz_mre.wav`;
+    AudioEncoderUI.downloadWAV(state.outputBuffer, state.outputSampleRate, filename);
+    ToastUI.show(`Downloading ${filename}`);
+  }
+
+  // ── Preview tuned output ──────────────────────────────────
+  let _previewCtx = null;
+  function previewTuned() {
+    if (!state.outputBuffer || !state.outputSampleRate) {
+      ToastUI.show('No audio output available — process an audio file first');
+      return;
+    }
+    if (_previewCtx) {
+      try { _previewCtx.close(); } catch(e) {}
+      _previewCtx = null;
+      const btn = document.getElementById('dlPreview');
+      if (btn) btn.textContent = '▶ Preview';
+      return;
+    }
+    const btn = document.getElementById('dlPreview');
+    if (btn) btn.textContent = '■ Stop';
+    ToastUI.show(`Previewing ${state.selectedHz}Hz aligned output...`);
+    _previewCtx = AudioEncoderUI.preview(
+      state.outputBuffer,
+      state.outputSampleRate,
+      () => {
+        _previewCtx = null;
+        if (btn) btn.textContent = '▶ Preview';
+      }
+    );
+  }
 
   // ── Reveal on scroll ──────────────────────────────────────
   function initReveal() {
