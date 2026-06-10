@@ -5,7 +5,7 @@
  * Core functions are called here. UI is updated from here.
  * Neither core nor UI know about each other directly.
  *
- * v0.4 · https://github.com/[your-username]/media-resonance-engine
+ * v0.5 · https://github.com/[your-username]/media-resonance-engine
  */
 
 const MREState = (() => {
@@ -20,6 +20,7 @@ const MREState = (() => {
     fileSizeMB:        0,
     fileData:          null,   // ReadResult from FileReaderUI.read()
     waveformSamples:   null,   // Float32Array — downsampled for SVG
+    analysisData:      null,   // Real FFT analysis results (v0.5+)
     processed:         false,
     abMode:            'A',
     originalScores:    null,
@@ -190,7 +191,7 @@ const MREState = (() => {
   }
 
   // ── Processing ────────────────────────────────────────────
-  function startProcessing() {
+  async function startProcessing() {
     if (!state.fileLoaded) {
       UploadUI.nudge();
       ToastUI.show('Upload a file to begin · or drop one into the zone above');
@@ -198,7 +199,7 @@ const MREState = (() => {
     }
 
     const btn = document.getElementById('processBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Aligning...'; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Analysing...'; }
 
     const processingEl = document.getElementById('processingState');
     const promptEl     = document.getElementById('uploadPrompt');
@@ -206,15 +207,27 @@ const MREState = (() => {
 
     if (processingEl) processingEl.classList.add('active');
     if (promptEl)     promptEl.style.display  = 'none';
-    if (outputStatus) outputStatus.textContent = `Aligning to ${state.selectedHz}Hz · ${state.intensity}%...`;
+    if (outputStatus) outputStatus.textContent = `Analysing ${state.fileName}...`;
 
     ['pBar1','pBar2','pBar3'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.width = '0%';
     });
 
+    // ── Stage 1: Real FFT analysis (runs immediately, before UI stages) ──
+    let baseScores;
+    try {
+      _updateStage('Running spectral analysis...');
+      baseScores = await _analyseFileAsync();
+      state.analysisData = baseScores._raw || null;
+      delete baseScores._raw;
+    } catch (err) {
+      console.warn('MRE: analysis error —', err.message);
+      baseScores = { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
+    }
+
+    // ── Stage 2: UI pipeline animation ──
     const stages = [
-      `Analysing ${state.selectedMediaType} spectral content...`,
       `Mapping harmonic signature...`,
       `Calculating delta to ${state.selectedHz}Hz...`,
       `Applying resonance alignment at ${state.intensity}%...`,
@@ -223,24 +236,20 @@ const MREState = (() => {
     ];
     let stageIdx = 0;
     const stageInterval = setInterval(() => {
-      const stageEl = document.getElementById('processingStage');
-      if (stageEl) stageEl.textContent = stages[Math.min(stageIdx, stages.length - 1)];
+      _updateStage(stages[Math.min(stageIdx, stages.length - 1)]);
       stageIdx++;
     }, 700);
 
     const t = (ms, fn) => setTimeout(fn, ms);
-    t(400,  () => { const b = document.getElementById('pBar1'); if(b) b.style.width = '100%'; });
-    t(1500, () => { const b = document.getElementById('pBar2'); if(b) b.style.width = '100%'; });
-    t(2700, () => { const b = document.getElementById('pBar3'); if(b) b.style.width = '100%'; });
+    t(200,  () => { const b = document.getElementById('pBar1'); if(b) b.style.width = '100%'; });
+    t(1000, () => { const b = document.getElementById('pBar2'); if(b) b.style.width = '100%'; });
+    t(1800, () => { const b = document.getElementById('pBar3'); if(b) b.style.width = '100%'; });
 
     setTimeout(() => {
       clearInterval(stageInterval);
       if (processingEl) processingEl.classList.remove('active');
 
-      // v0.5 will compute scores from real file data
-      // For now: generate scores that reflect actual file characteristics
-      const baseScores = _estimateBaseScores();
-      const tuned      = ResonanceAnalyser.applyIntensity(baseScores, state.intensity, state.selectedHz);
+      const tuned = ResonanceAnalyser.applyIntensity(baseScores, state.intensity, state.selectedHz);
 
       state.originalScores = baseScores;
       state.tunedScores    = tuned;
@@ -256,30 +265,34 @@ const MREState = (() => {
         tunedScores:    tuned,
       });
 
+      // Enrich report with raw analysis data if available
+      if (state.analysisData) {
+        state.report.analysis = state.analysisData;
+      }
+
       _showResults();
       if (btn) { btn.disabled = false; btn.textContent = 'Align to Resonance →'; }
-    }, 4000);
+    }, 2500);
   }
 
+  function _updateStage(text) {
+    const el = document.getElementById('processingStage');
+    if (el) el.textContent = text;
+  }
+
+  // ── Real FFT analysis ─────────────────────────────────────
   /**
-   * Estimate base scores from real file data where available.
-   * Returns plausible scores derived from actual file characteristics.
-   * Full real scoring comes in v0.5.
+   * Run real frequency analysis on the loaded file data.
+   * Returns ResonanceScore with an extra _raw property containing
+   * raw measurements for the report. _raw is stripped before storing.
    */
-  function _estimateBaseScores() {
+  async function _analyseFileAsync() {
     const data = state.fileData;
+
+    // ── No file data — return neutral baseline ──
     if (!data) return { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
 
-    if (data.type === 'audio') {
-      // Use RMS amplitude as a proxy for signal quality
-      const rms      = data.channelData ? FFTUtils.rmsAmplitude(data.channelData[0]) : 0.3;
-      const harmonic  = Math.round(40 + rms * 40);
-      const coherence = Math.round(35 + rms * 35);
-      const clarity   = Math.round(50 + rms * 30);
-      const alignment = Math.round(30 + Math.random() * 20); // real FFT analysis in v0.5
-      return { harmonic, coherence, clarity, alignment };
-    }
-
+    // ── Image scoring — already real from v0.4 pixel analysis ──
     if (data.type === 'image') {
       return ResonanceAnalyser.scoreImage({
         dominantHue:    data.dominantHue    || 0,
@@ -291,6 +304,7 @@ const MREState = (() => {
       });
     }
 
+    // ── Text scoring — already real from v0.4 linguistic analysis ──
     if (data.type === 'text') {
       return ResonanceAnalyser.scoreText({
         avgSyllablesPerWord:  data.avgSyllablesPerWord  || 1.5,
@@ -301,7 +315,157 @@ const MREState = (() => {
       });
     }
 
+    // ── Audio: real FFT analysis via AnalyserNode ──────────────
+    if (data.type === 'audio' && data.channelData && data.channelData[0]) {
+      return await _runAudioFFT(data);
+    }
+
     return { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
+  }
+
+  /**
+   * Run real FFT analysis on audio channel data.
+   * Uses AnalyserNode for browser-native FFT.
+   * All DOM/Web Audio calls happen here — results are plain objects.
+   */
+  async function _runAudioFFT(data) {
+    const FFT_SIZE   = 8192;   // High resolution for accurate frequency detection
+    const sampleRate = data.sampleRate || 44100;
+
+    try {
+      // Create offline context sized to analyse a representative chunk
+      // Take middle 2 seconds of the audio for analysis (most musically representative)
+      const chunkDuration  = Math.min(2, data.duration || 2);
+      const chunkStart     = Math.max(0, Math.floor((data.duration || 0) / 2) - chunkDuration / 2);
+      const chunkSamples   = Math.floor(chunkDuration * sampleRate);
+      const startSample    = Math.floor(chunkStart * sampleRate);
+
+      const channelCount   = data.channelData.length;
+      const offlineCtx     = new OfflineAudioContext(
+        channelCount,
+        Math.max(chunkSamples, FFT_SIZE * 2),
+        sampleRate
+      );
+
+      // Reconstruct AudioBuffer in offline context
+      const audioBuffer = offlineCtx.createBuffer(channelCount, chunkSamples, sampleRate);
+      for (let c = 0; c < channelCount; c++) {
+        const src    = data.channelData[c];
+        const dest   = audioBuffer.getChannelData(c);
+        const end    = Math.min(startSample + chunkSamples, src.length);
+        const actual = end - startSample;
+        for (let i = 0; i < actual; i++) {
+          dest[i] = src[startSample + i];
+        }
+      }
+
+      // Create analyser + source in offline context
+      const analyser = offlineCtx.createAnalyser();
+      analyser.fftSize = FFT_SIZE;
+      const source = offlineCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(analyser);
+      analyser.connect(offlineCtx.destination);
+      source.start(0);
+
+      // Render to get frequency data
+      await offlineCtx.startRendering();
+
+      // Extract frequency spectrum
+      const freqDataDb  = new Float32Array(analyser.frequencyBinCount);
+      const freqDataLin = new Float32Array(analyser.frequencyBinCount);
+      const timeData    = new Float32Array(analyser.fftSize);
+
+      analyser.getFloatFrequencyData(freqDataDb);
+      analyser.getFloatTimeDomainData(timeData);
+
+      // Convert dB to linear for energy calculations
+      for (let i = 0; i < freqDataDb.length; i++) {
+        freqDataLin[i] = freqDataDb[i] > -Infinity
+          ? Math.pow(10, freqDataDb[i] / 20)
+          : 0;
+      }
+
+      // Apply Hann window to time domain for better spectral accuracy
+      const windowed = FFTUtils.hannWindow(timeData);
+
+      // ── Core measurements via FrequencyEngine ──────────────
+      const dominantHz    = FrequencyEngine.dominantFrequency(freqDataDb, sampleRate, FFT_SIZE);
+      const centroidHz    = FrequencyEngine.spectralCentroid(freqDataLin, sampleRate, FFT_SIZE);
+      const harmonicRatio = FrequencyEngine.harmonicRatio(freqDataLin, dominantHz, sampleRate, FFT_SIZE);
+      const rms           = FFTUtils.rmsAmplitude(windowed);
+      const topPeaks      = FFTUtils.topPeaks(freqDataLin, sampleRate, FFT_SIZE, 5);
+
+      // ── Score via ResonanceAnalyser ────────────────────────
+      const scores = ResonanceAnalyser.scoreAudio({
+        dominantHz,
+        targetHz:         state.selectedHz,
+        harmonicRatio,
+        spectralCentroidHz: centroidHz,
+        rmsAmplitude:     rms,
+        intensity:        state.intensity,
+      });
+
+      // Update metadata display with real detected frequency
+      _updateDetectedFrequency(dominantHz);
+
+      // Attach raw analysis data for the report (_raw stripped before storing in state)
+      scores._raw = {
+        dominantHz:      Math.round(dominantHz * 10) / 10,
+        targetHz:        state.selectedHz,
+        centroidHz:      Math.round(centroidHz),
+        harmonicRatio:   Math.round(harmonicRatio * 1000) / 1000,
+        rmsAmplitude:    Math.round(rms * 1000) / 1000,
+        centsFromTarget: Math.round(FrequencyEngine.centsDelta(dominantHz, state.selectedHz)),
+        topPeaksHz:      topPeaks.map(p => Math.round(p.hz)),
+        fftSize:         FFT_SIZE,
+        sampleRate,
+        analysedAt:      new Date().toISOString(),
+      };
+
+      return scores;
+
+    } catch (err) {
+      console.warn('MRE: FFT analysis failed —', err.message);
+      // Graceful fallback to RMS-only estimate
+      const rms      = data.channelData ? FFTUtils.rmsAmplitude(data.channelData[0]) : 0.3;
+      return {
+        harmonic:  Math.round(40 + rms * 40),
+        coherence: Math.round(35 + rms * 35),
+        clarity:   Math.round(50 + rms * 30),
+        alignment: Math.round(30 + rms * 20),
+      };
+    }
+  }
+
+  /**
+   * Update the metadata bar with the real detected dominant frequency.
+   * Called after FFT analysis completes.
+   */
+  function _updateDetectedFrequency(dominantHz) {
+    const el = document.getElementById('fileMetadata');
+    if (!el) return;
+
+    // Add or update the detected frequency item
+    let detectedEl = document.getElementById('metaDetectedHz');
+    if (!detectedEl) {
+      detectedEl = document.createElement('span');
+      detectedEl.id = 'metaDetectedHz';
+      detectedEl.className = 'meta-item';
+      el.appendChild(detectedEl);
+    }
+
+    const cents     = FrequencyEngine.centsDelta(dominantHz, state.selectedHz);
+    const direction = cents > 0 ? '▲' : '▼';
+    const absCents  = Math.abs(Math.round(cents));
+
+    detectedEl.innerHTML = `
+      <span class="meta-label">Detected freq</span>
+      ${Math.round(dominantHz)}Hz
+      <span style="font-size:0.55rem;color:${absCents < 50 ? 'var(--green)' : 'var(--gold-dim)'}">
+        ${direction}${absCents}¢ from ${state.selectedHz}Hz
+      </span>
+    `;
   }
 
   function _showResults() {
