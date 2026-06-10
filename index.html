@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <!--
   Media Resonance Engine · v0.3
@@ -19,7 +18,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Media Resonance Engine — Frequency alignment for every medium. Tune your audio, video, image and text to natural resonance frequencies.">
-  <meta name="version" content="0.5">
+  <meta name="version" content="0.6">
   <style>
     .meta-item {
       display:flex; flex-direction:column; gap:0.15rem;
@@ -93,16 +92,16 @@
       <circle cx="140" cy="140" r="50"  fill="url(#orbGrad)"/>
       <!-- Rotating arcs -->
       <g id="rotArc">
-      <animateTransform attributeName="transform" type="rotate"
-      from="0 140 140" to="360 140 140" dur="8s" repeatCount="indefinite"/>
-      <path d="M 140 10 A 130 130 0 0 1 270 140" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1" stroke-linecap="round"/>
-      <circle cx="270" cy="140" r="3" fill="#C9A96E"/>
+        <animateTransform attributeName="transform" type="rotate"
+          from="0 140 140" to="360 140 140" dur="8s" repeatCount="indefinite"/>
+        <path d="M 140 10 A 130 130 0 0 1 270 140" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1" stroke-linecap="round"/>
+        <circle cx="270" cy="140" r="3" fill="#C9A96E"/>
       </g>
       <g id="rotArcInner">
-      <animateTransform attributeName="transform" type="rotate"
-      from="360 140 140" to="0 140 140" dur="5s" repeatCount="indefinite"/>
-      <path d="M 140 70 A 70 70 0 0 1 210 140" fill="none" stroke="rgba(201,169,110,0.35)" stroke-width="1" stroke-linecap="round"/>
-      <circle cx="210" cy="140" r="2.5" fill="#C9A96E" opacity="0.7"/>
+        <animateTransform attributeName="transform" type="rotate"
+          from="360 140 140" to="0 140 140" dur="5s" repeatCount="indefinite"/>
+        <path d="M 140 70 A 70 70 0 0 1 210 140" fill="none" stroke="rgba(201,169,110,0.35)" stroke-width="1" stroke-linecap="round"/>
+        <circle cx="210" cy="140" r="2.5" fill="#C9A96E" opacity="0.7"/>
       </g>
       <!-- Hz display -->
       <text id="orbHz" x="140" y="134" text-anchor="middle" font-family="'DM Mono'" font-size="24" font-weight="300" fill="#C9A96E">432</text>
@@ -163,7 +162,7 @@
       </div>
       <div class="status-badge">
         <span class="status-dot"></span>
-        Live · v0.5
+        Live · v0.6
       </div>
     </div>
 
@@ -308,9 +307,9 @@
           </div>
 
           <div class="download-row" id="downloadRow" style="display:none">
-            <button class="dl-btn">WAV Lossless</button>
-            <button class="dl-btn">MP3 320k</button>
-            <button class="dl-btn gold">Full Report</button>
+            <button class="dl-btn gold" id="dlWAV" onclick="MREState.downloadWAV()">↓ WAV</button>
+            <button class="dl-btn" id="dlPreview" onclick="MREState.previewTuned()">▶ Preview</button>
+            <button class="dl-btn" onclick="MREState.downloadReport()">↓ Report</button>
           </div>
         </div>
       </div>
@@ -442,7 +441,7 @@
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem">
     <div class="footer-copy">© 2025 Media Resonance Engine · All frequencies reserved.</div>
     <div class="version-tag-footer">
-      v0.5 · <a href="https://github.com/[your-username]/media-resonance-engine" target="_blank">
+      v0.6 · <a href="https://github.com/[your-username]/media-resonance-engine" target="_blank">
         github.com/media-resonance-engine
       </a>
     </div>

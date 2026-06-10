@@ -533,3 +533,133 @@ const FileReaderUI = (() => {
   return { read, readAudio, readImage, readText };
 
 })();
+
+
+/**
+ * MEDIA RESONANCE ENGINE · ui/audio-encoder.js (embedded in ui.js)
+ * ──────────────────────────────────────────────────────────────────
+ * Encodes Float32Array channel data to WAV blob and triggers download.
+ * DOM layer only — no pure logic, just browser API calls.
+ * v0.6
+ */
+const AudioEncoderUI = (() => {
+
+  /**
+   * Encode channel data arrays to a WAV Blob.
+   * Produces standard 16-bit PCM WAV — plays in every audio application.
+   *
+   * @param {Float32Array[]} channelData  — array of per-channel samples
+   * @param {number}         sampleRate
+   * @returns {Blob} WAV blob
+   */
+  function encodeWAV(channelData, sampleRate) {
+    const numChannels  = channelData.length;
+    const numSamples   = channelData[0].length;
+    const bitDepth     = 16;
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign   = numChannels * bytesPerSample;
+    const byteRate     = sampleRate * blockAlign;
+    const dataSize     = numSamples * blockAlign;
+    const bufferSize   = 44 + dataSize;
+
+    const buffer = new ArrayBuffer(bufferSize);
+    const view   = new DataView(buffer);
+
+    // ── WAV header ──
+    _writeString(view, 0,  'RIFF');
+    view.setUint32( 4,  bufferSize - 8,  true);
+    _writeString(view, 8,  'WAVE');
+    _writeString(view, 12, 'fmt ');
+    view.setUint32( 16, 16,              true);  // PCM chunk size
+    view.setUint16( 20, 1,               true);  // PCM format
+    view.setUint16( 22, numChannels,     true);
+    view.setUint32( 24, sampleRate,      true);
+    view.setUint32( 28, byteRate,        true);
+    view.setUint16( 32, blockAlign,      true);
+    view.setUint16( 34, bitDepth,        true);
+    _writeString(view, 36, 'data');
+    view.setUint32( 40, dataSize,        true);
+
+    // ── Interleave channels and write PCM samples ──
+    let offset = 44;
+    for (let i = 0; i < numSamples; i++) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        // Clamp and convert float32 → int16
+        const sample = Math.max(-1, Math.min(1, channelData[ch][i]));
+        const int16  = sample < 0
+          ? Math.round(sample * 32768)
+          : Math.round(sample * 32767);
+        view.setInt16(offset, int16, true);
+        offset += 2;
+      }
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
+  function _writeString(view, offset, str) {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  }
+
+  /**
+   * Trigger a WAV file download in the browser.
+   * @param {Float32Array[]} channelData
+   * @param {number}         sampleRate
+   * @param {string}         filename
+   */
+  function downloadWAV(channelData, sampleRate, filename) {
+    const blob = encodeWAV(channelData, sampleRate);
+    _triggerDownload(blob, filename);
+  }
+
+  /**
+   * Trigger download of any blob.
+   * @param {Blob}   blob
+   * @param {string} filename
+   */
+  function _triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href    = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Play a preview of channel data in the browser.
+   * Creates a temporary AudioContext for playback.
+   * @param {Float32Array[]} channelData
+   * @param {number}         sampleRate
+   * @param {Function}       [onEnded]   — callback when playback finishes
+   * @returns {AudioContext} — caller can call .close() to stop early
+   */
+  function preview(channelData, sampleRate, onEnded) {
+    const ctx         = new (window.AudioContext || window.webkitAudioContext)();
+    const numChannels = channelData.length;
+    const numSamples  = channelData[0].length;
+
+    const audioBuffer = ctx.createBuffer(numChannels, numSamples, sampleRate);
+    for (let ch = 0; ch < numChannels; ch++) {
+      audioBuffer.getChannelData(ch).set(channelData[ch]);
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    source.onended = () => {
+      ctx.close();
+      if (onEnded) onEnded();
+    };
+    source.start(0);
+
+    return ctx; // return so caller can stop early
+  }
+
+  return { encodeWAV, downloadWAV, preview };
+
+})();

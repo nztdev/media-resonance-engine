@@ -5,7 +5,7 @@
  * Core functions are called here. UI is updated from here.
  * Neither core nor UI know about each other directly.
  *
- * v0.5 · https://github.com/[your-username]/media-resonance-engine
+ * v0.6 · https://github.com/[your-username]/media-resonance-engine
  */
 
 const MREState = (() => {
@@ -21,6 +21,8 @@ const MREState = (() => {
     fileData:          null,   // ReadResult from FileReaderUI.read()
     waveformSamples:   null,   // Float32Array — downsampled for SVG
     analysisData:      null,   // Real FFT analysis results (v0.5+)
+    outputBuffer:      null,   // Processed channel data (v0.6+)
+    outputSampleRate:  null,   // Sample rate of processed output
     processed:         false,
     abMode:            'A',
     originalScores:    null,
@@ -214,16 +216,40 @@ const MREState = (() => {
       if (el) el.style.width = '0%';
     });
 
-    // ── Stage 1: Real FFT analysis (runs immediately, before UI stages) ──
+    // ── Stage 1: Real FFT analysis ──
     let baseScores;
+    let fundamentalHz = null;
     try {
       _updateStage('Running spectral analysis...');
       baseScores = await _analyseFileAsync();
       state.analysisData = baseScores._raw || null;
+      fundamentalHz      = state.analysisData?.fundamentalHz || state.analysisData?.dominantHz || null;
       delete baseScores._raw;
     } catch (err) {
       console.warn('MRE: analysis error —', err.message);
       baseScores = { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
+    }
+
+    // ── Stage 2: Real pitch shifting ──
+    if (state.fileData?.type === 'audio' && state.fileData?.channelData && fundamentalHz) {
+      try {
+        _updateStage(`Shifting pitch from ${Math.round(fundamentalHz)}Hz to ${state.selectedHz}Hz...`);
+        const ratio  = FrequencyEngine.pitchRatio(fundamentalHz, state.selectedHz);
+        // Clamp ratio to ±2 octaves to avoid extreme artifacts
+        const clampedRatio = Math.max(0.25, Math.min(4.0, ratio));
+        const result = FrequencyEngine.resampleChannelData(
+          state.fileData.channelData,
+          state.fileData.sampleRate,
+          clampedRatio
+        );
+        state.outputBuffer      = result.channelData;
+        state.outputSampleRate  = state.fileData.sampleRate; // keep original rate — resampling shifts pitch via length change
+        ToastUI.show(`Pitch shifted · ratio ${clampedRatio.toFixed(3)} · WAV ready to download`);
+      } catch (err) {
+        console.warn('MRE: pitch shift error —', err.message);
+        state.outputBuffer     = null;
+        state.outputSampleRate = null;
+      }
     }
 
     // ── Stage 2: UI pipeline animation ──
@@ -391,32 +417,35 @@ const MREState = (() => {
 
       // ── Core measurements via FrequencyEngine ──────────────
       const dominantHz    = FrequencyEngine.dominantFrequency(freqDataDb, sampleRate, FFT_SIZE);
+      const fundamentalHz = FrequencyEngine.fundamentalFrequency(freqDataLin, sampleRate, FFT_SIZE);
+      const useHz         = fundamentalHz || dominantHz;
       const centroidHz    = FrequencyEngine.spectralCentroid(freqDataLin, sampleRate, FFT_SIZE);
-      const harmonicRatio = FrequencyEngine.harmonicRatio(freqDataLin, dominantHz, sampleRate, FFT_SIZE);
+      const harmonicRatio = FrequencyEngine.harmonicRatio(freqDataLin, useHz, sampleRate, FFT_SIZE);
       const rms           = FFTUtils.rmsAmplitude(windowed);
       const topPeaks      = FFTUtils.topPeaks(freqDataLin, sampleRate, FFT_SIZE, 5);
 
       // ── Score via ResonanceAnalyser ────────────────────────
       const scores = ResonanceAnalyser.scoreAudio({
-        dominantHz,
-        targetHz:         state.selectedHz,
+        dominantHz:         useHz,
+        targetHz:           state.selectedHz,
         harmonicRatio,
         spectralCentroidHz: centroidHz,
-        rmsAmplitude:     rms,
-        intensity:        state.intensity,
+        rmsAmplitude:       rms,
+        intensity:          state.intensity,
       });
 
       // Update metadata display with real detected frequency
-      _updateDetectedFrequency(dominantHz);
+      _updateDetectedFrequency(useHz);
 
       // Attach raw analysis data for the report (_raw stripped before storing in state)
       scores._raw = {
-        dominantHz:      Math.round(dominantHz * 10) / 10,
+        fundamentalHz:   Math.round(fundamentalHz * 10) / 10,
+        dominantHz:      Math.round(dominantHz    * 10) / 10,
         targetHz:        state.selectedHz,
         centroidHz:      Math.round(centroidHz),
         harmonicRatio:   Math.round(harmonicRatio * 1000) / 1000,
         rmsAmplitude:    Math.round(rms * 1000) / 1000,
-        centsFromTarget: Math.round(FrequencyEngine.centsDelta(dominantHz, state.selectedHz)),
+        centsFromTarget: Math.round(FrequencyEngine.centsDelta(useHz, state.selectedHz)),
         topPeaksHz:      topPeaks.map(p => Math.round(p.hz)),
         fftSize:         FFT_SIZE,
         sampleRate,
@@ -477,9 +506,24 @@ const MREState = (() => {
     if (dlRow)     dlRow.style.display   = 'flex';
     if (promptEl)  promptEl.style.display = 'none';
 
+    // Enable/disable WAV download button based on whether output exists
+    const wavBtn     = document.getElementById('dlWAV');
+    const previewBtn = document.getElementById('dlPreview');
+    if (wavBtn) {
+      wavBtn.disabled         = !state.outputBuffer;
+      wavBtn.style.opacity    = state.outputBuffer ? '1' : '0.4';
+      wavBtn.title            = state.outputBuffer
+        ? `Download ${state.selectedHz}Hz aligned WAV`
+        : 'Audio output not available for this file type';
+    }
+    if (previewBtn) {
+      previewBtn.disabled      = !state.outputBuffer;
+      previewBtn.style.opacity = state.outputBuffer ? '1' : '0.4';
+    }
+
     MetersUI.setAll(state.originalScores);
     setABMode('A');
-    ToastUI.show(`Aligned to ${state.selectedHz}Hz · switch to B to compare`);
+    ToastUI.show(`Aligned to ${state.selectedHz}Hz · ${state.outputBuffer ? 'WAV ready · ' : ''}switch to B to compare`);
   }
 
   // ── A/B ───────────────────────────────────────────────────
@@ -575,6 +619,8 @@ const MREState = (() => {
     startProcessing,
     setABMode,
     submitWaitlist,
+    downloadWAV,
+    previewTuned,
     downloadReport,
     initReveal,
     selectFreqFromTable,

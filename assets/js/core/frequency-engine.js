@@ -6,7 +6,7 @@
  * This file is React Native portable — copy to packages/core unchanged.
  *
  * Exports: FrequencyEngine
- * v0.3 · https://github.com/[your-username]/media-resonance-engine
+ * v0.6 · https://github.com/[your-username]/media-resonance-engine
  */
 
 const FrequencyEngine = (() => {
@@ -105,6 +105,55 @@ const FrequencyEngine = (() => {
     }
 
     return (maxIdx * sampleRate) / fftSize;
+  }
+
+  /**
+   * Find the fundamental (lowest significant) frequency in a spectrum.
+   * Unlike dominantFrequency() which finds the highest energy bin,
+   * this finds the lowest peak with energy above a significance threshold.
+   * More accurate for pitched material like music and voice.
+   *
+   * @param {Float32Array} magnitudeSpectrum — linear magnitudes
+   * @param {number}       sampleRate
+   * @param {number}       fftSize
+   * @param {number}       minHz             — ignore below this (default 60Hz)
+   * @param {number}       maxHz             — ignore above this (default 2000Hz)
+   * @param {number}       threshold         — min magnitude relative to peak (default 0.05)
+   * @returns {number} fundamentalFrequencyHz
+   */
+  function fundamentalFrequency(magnitudeSpectrum, sampleRate, fftSize,
+    minHz = 60, maxHz = 2000, threshold = 0.05) {
+
+    const binHz  = sampleRate / fftSize;
+    const minBin = Math.ceil(minHz / binHz);
+    const maxBin = Math.min(Math.floor(maxHz / binHz), magnitudeSpectrum.length - 1);
+
+    // Find peak magnitude for relative threshold
+    let peakMag = 0;
+    for (let i = minBin; i <= maxBin; i++) {
+      if (magnitudeSpectrum[i] > peakMag) peakMag = magnitudeSpectrum[i];
+    }
+    const minMag = peakMag * threshold;
+
+    // Find lowest local peak above threshold
+    for (let i = minBin + 1; i < maxBin - 1; i++) {
+      const m = magnitudeSpectrum[i];
+      if (m >= minMag &&
+          m > magnitudeSpectrum[i - 1] &&
+          m > magnitudeSpectrum[i + 1]) {
+
+        // Parabolic interpolation for sub-bin accuracy
+        const alpha  = magnitudeSpectrum[i - 1];
+        const beta   = m;
+        const gamma  = magnitudeSpectrum[i + 1];
+        const denom  = alpha - 2 * beta + gamma;
+        const offset = denom !== 0 ? 0.5 * (alpha - gamma) / denom : 0;
+        return (i + offset) * binHz;
+      }
+    }
+
+    // Fallback to dominant if no fundamental found in range
+    return dominantFrequency(magnitudeSpectrum, sampleRate, fftSize);
   }
 
   /**
@@ -260,6 +309,7 @@ const FrequencyEngine = (() => {
 
     // Analysis
     dominantFrequency,
+    fundamentalFrequency,
     spectralCentroid,
     harmonicRatio,
 
