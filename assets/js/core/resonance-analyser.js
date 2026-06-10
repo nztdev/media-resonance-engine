@@ -6,7 +6,7 @@
  * This file is React Native portable — copy to packages/core unchanged.
  *
  * Exports: ResonanceAnalyser
- * v0.3 · https://github.com/[your-username]/media-resonance-engine
+ * v0.5 · https://github.com/nztdev/media-resonance-engine
  */
 
 const ResonanceAnalyser = (() => {
@@ -192,7 +192,7 @@ const ResonanceAnalyser = (() => {
     return {
       meta: {
         engine:    'Media Resonance Engine',
-        version:   '0.3',
+        version:   '0.5',
         timestamp: new Date().toISOString(),
         fileName,
         mediaType,
