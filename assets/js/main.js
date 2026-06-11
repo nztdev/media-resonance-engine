@@ -143,7 +143,7 @@
     'color:#C9A96E;font-family:monospace;font-size:10px;'
   );
   console.log(
-    '%c github.com/[your-username]/media-resonance-engine ',
+    '%c github.com/nztdev/media-resonance-engine ',
     'color:#8A6D3F;font-family:monospace;font-size:10px;'
   );
 
