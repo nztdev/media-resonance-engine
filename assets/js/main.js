@@ -135,7 +135,7 @@
 
   // ── Console signature ─────────────────────────────────────
   console.log(
-    '%c Media Resonance Engine · v0.5 ',
+    '%c Media Resonance Engine · v0.6 ',
     'background:#C9A96E;color:#0A0906;font-family:monospace;font-size:11px;padding:4px 8px;border-radius:2px;'
   );
   console.log(
