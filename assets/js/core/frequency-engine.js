@@ -294,8 +294,11 @@ const FrequencyEngine = (() => {
   }
 
   function _processChannel(channel, ratio, fftSize, overlap, wetDry) {
-    const hopA      = Math.floor(fftSize / overlap);  // analysis hop
-    const hopS      = Math.floor(hopA * ratio);        // synthesis hop (scaled)
+    const hopA      = Math.floor(fftSize / overlap);  // analysis hop — fixed
+    const hopS      = hopA;                            // synthesis hop — ALSO fixed
+    // Pitch shift comes from phase scaling only, NOT from hop ratio change.
+    // Changing hopS causes time-stretching. We want pitch shift only.
+
     const numFrames = Math.floor((channel.length - fftSize) / hopA) + 1;
     const output    = new Float32Array(channel.length + fftSize);
     const window    = _makeHannWindow(fftSize);
@@ -326,31 +329,34 @@ const FrequencyEngine = (() => {
       // ── FFT ──
       _fft(re, im, false);
 
-      // ── Phase processing ──
-      const mag    = new Float32Array(fftSize / 2 + 1);
-      const phase  = new Float32Array(fftSize / 2 + 1);
+      // ── Phase vocoder processing ──
+      const mag   = new Float32Array(fftSize / 2 + 1);
+      const phase = new Float32Array(fftSize / 2 + 1);
 
       for (let k = 0; k <= fftSize / 2; k++) {
         mag[k]   = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
         phase[k] = Math.atan2(im[k], re[k]);
 
-        // True frequency via phase difference
-        let dp    = phase[k] - lastPhase[k] - expectedPhaseAdv[k];
+        // Phase difference from expected
+        let dp = phase[k] - lastPhase[k] - expectedPhaseAdv[k];
         // Wrap to [-π, π]
         dp -= 2 * Math.PI * Math.round(dp / (2 * Math.PI));
 
-        // Accumulate scaled phase
-        phaseAcc[k]  += expectedPhaseAdv[k] / hopA * hopS + dp / hopA * hopS;
+        // True instantaneous frequency deviation
+        const trueFreqDev = dp / hopA;
+
+        // Scale frequency by pitch ratio — this is where pitch shift happens
+        // Synthesis phase advances at ratio * true frequency
+        phaseAcc[k] += hopS * (expectedPhaseAdv[k] / hopA + trueFreqDev) * ratio;
         lastPhase[k]  = phase[k];
       }
 
-      // ── Reconstruct spectrum with new phases ──
+      // ── Reconstruct spectrum with scaled phases ──
       const reOut = new Float32Array(fftSize);
       const imOut = new Float32Array(fftSize);
       for (let k = 0; k <= fftSize / 2; k++) {
         reOut[k] = mag[k] * Math.cos(phaseAcc[k]);
         imOut[k] = mag[k] * Math.sin(phaseAcc[k]);
-        // Mirror for IFFT
         if (k > 0 && k < fftSize / 2) {
           reOut[fftSize - k] =  reOut[k];
           imOut[fftSize - k] = -imOut[k];
@@ -360,7 +366,7 @@ const FrequencyEngine = (() => {
       // ── IFFT ──
       _fft(reOut, imOut, true);
 
-      // ── Overlap-add into output ──
+      // ── Overlap-add at synthesis hop ──
       const outputPos = frame * hopS;
       for (let i = 0; i < fftSize; i++) {
         if (outputPos + i < output.length) {
@@ -374,6 +380,7 @@ const FrequencyEngine = (() => {
     const outRMS = _rms(output.subarray(0, channel.length));
     const gain   = outRMS > 0.0001 ? inRMS / outRMS : 1;
 
+    // ── Wet/dry blend ──
     const result = new Float32Array(channel.length);
     for (let i = 0; i < channel.length; i++) {
       const dry = channel[i];
