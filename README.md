@@ -12,7 +12,7 @@ A free, open-source tool for tuning audio, video, image, and text to natural res
 
 The Media Resonance Engine analyses any media file and realigns its frequency signature to a target solfège frequency — 432Hz by default. The result is a harmonically coherent version of your original content with a full A/B resonance report.
 
-**Supported media types:** Audio · Video · Image · Text · PDF
+**Supported media types:** Audio · Others coming later: Video · Image · Text · PDF
 
 **Available frequencies:** 396 · 417 · 432 · 528 · 639 · 741 · 852 · 963 Hz
 
