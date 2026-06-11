@@ -230,41 +230,28 @@ const MREState = (() => {
       baseScores = { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
     }
 
-    // ── Stage 2: Phase vocoder pitch shifting ──
+    // ── Stage 2: Hybrid tuning engine ──
     if (state.fileData?.type === 'audio' && state.fileData?.channelData && fundamentalHz) {
       try {
-        _updateStage(`Tuning from ${Math.round(fundamentalHz)}Hz → ${state.selectedHz}Hz...`);
-        const ratio    = FrequencyEngine.pitchRatio(fundamentalHz, state.selectedHz);
-        const wetDry   = state.intensity / 100;
+        const shiftCents = Math.abs(FrequencyEngine.centsDelta(fundamentalHz, state.selectedHz));
+        const method     = shiftCents <= 100 ? 'resampling' : 'phase vocoder';
+        _updateStage(`Tuning ${Math.round(fundamentalHz)}Hz → ${state.selectedHz}Hz via ${method}...`);
 
-        // Use phase vocoder for subtle, tempo-preserving pitch shift
-        // Falls back gracefully if ratio is extreme (> ±1 octave handled internally)
-        const shifted = FrequencyEngine.phaseVocoder(
+        const wetDry  = state.intensity / 100;
+        const shifted = FrequencyEngine.tuneTo(
           state.fileData.channelData,
-          ratio,
-          { fftSize: 2048, overlap: 4, wetDry }
+          fundamentalHz,
+          state.selectedHz,
+          wetDry
         );
 
         state.outputBuffer     = shifted;
         state.outputSampleRate = state.fileData.sampleRate;
-        ToastUI.show(`Tuned to ${state.selectedHz}Hz · tempo preserved · WAV ready`);
+        ToastUI.show(`Tuned to ${state.selectedHz}Hz · ${method} · WAV ready`);
       } catch (err) {
-        console.warn('MRE: phase vocoder error —', err.message);
-        // Graceful fallback to resampling
-        try {
-          const ratio  = FrequencyEngine.pitchRatio(fundamentalHz, state.selectedHz);
-          const result = FrequencyEngine.resampleChannelData(
-            state.fileData.channelData,
-            state.fileData.sampleRate,
-            Math.max(0.25, Math.min(4.0, ratio))
-          );
-          state.outputBuffer     = result.channelData;
-          state.outputSampleRate = state.fileData.sampleRate;
-          ToastUI.show(`Tuned to ${state.selectedHz}Hz · WAV ready`);
-        } catch (e) {
-          state.outputBuffer     = null;
-          state.outputSampleRate = null;
-        }
+        console.warn('MRE: tuning error —', err.message);
+        state.outputBuffer     = null;
+        state.outputSampleRate = null;
       }
     }
 

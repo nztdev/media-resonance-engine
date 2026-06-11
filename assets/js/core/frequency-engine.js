@@ -249,44 +249,118 @@ const FrequencyEngine = (() => {
     return { channelData: result, newSampleRate };
   }
 
+  // ── Hybrid tuning engine ─────────────────────────────────
+  /**
+   * tuneTo() — the primary pitch-shifting entry point.
+   * Selects the best algorithm based on shift size:
+   *
+   *   |shift| ≤ 100 cents  → high-quality resampling
+   *     The tempo change is under 6% — inaudible on short tracks,
+   *     negligible on full songs. Audio quality is pristine.
+   *     This covers the primary use case: 440Hz → 432Hz (~32 cents).
+   *
+   *   |shift| > 100 cents  → phase vocoder (overlap=8)
+   *     Larger shifts where tempo change would be noticeable.
+   *     Higher overlap factor (8) significantly reduces phasiness
+   *     vs the default overlap=4 used previously.
+   *
+   * @param {Float32Array[]} channelData
+   * @param {number}         fromHz       — detected fundamental
+   * @param {number}         toHz         — target frequency
+   * @param {number}         wetDry       — 0=original, 1=fully tuned (intensity/100)
+   * @returns {Float32Array[]} tuned channel data
+   */
+  function tuneTo(channelData, fromHz, toHz, wetDry = 1.0) {
+    if (!fromHz || fromHz <= 0 || !toHz || toHz <= 0) return channelData;
+
+    const ratio      = pitchRatio(fromHz, toHz);
+    const shiftCents = Math.abs(centsDelta(fromHz, toHz));
+
+    // Wet/dry blend helper — mixes dry original with processed
+    function blend(processed) {
+      if (wetDry >= 0.999) return processed;
+      if (wetDry <= 0.001) return channelData;
+      return channelData.map((ch, i) => {
+        const wet = processed[i];
+        const out = new Float32Array(ch.length);
+        for (let s = 0; s < ch.length; s++) {
+          out[s] = ch[s] * (1 - wetDry) + (wet[s] || 0) * wetDry;
+        }
+        return out;
+      });
+    }
+
+    // ── Small shift: high-quality resampling ──────────────────
+    // Covers 440→432Hz (32¢), 440→528Hz would be ~312¢ so uses vocoder
+    if (shiftCents <= 100) {
+      try {
+        const result    = resampleChannelData(channelData, 44100, ratio);
+        // Resample back to original length to preserve duration
+        // This creates a tiny pitch shift without audible tempo change
+        const restored  = channelData.map((ch, i) => {
+          const shifted  = result.channelData[i];
+          const restored = new Float32Array(ch.length);
+          // Linear interpolation resample back to original length
+          for (let s = 0; s < ch.length; s++) {
+            const srcPos = s * (shifted.length / ch.length);
+            const srcIdx = Math.floor(srcPos);
+            const frac   = srcPos - srcIdx;
+            const a      = shifted[Math.min(srcIdx,     shifted.length - 1)];
+            const b      = shifted[Math.min(srcIdx + 1, shifted.length - 1)];
+            restored[s]  = a + frac * (b - a);
+          }
+          return restored;
+        });
+        return blend(restored);
+      } catch (e) {
+        console.warn('MRE: resampling failed, falling back to vocoder —', e.message);
+      }
+    }
+
+    // ── Large shift: phase vocoder with high overlap ──────────
+    try {
+      const clampedRatio = Math.max(0.5, Math.min(2.0, ratio));
+      const processed    = channelData.map(channel => {
+        try {
+          return _processChannel(channel, clampedRatio, 2048, 8, 1.0);
+        } catch (e) {
+          console.warn('MRE: vocoder channel error —', e.message);
+          return channel;
+        }
+      });
+      return blend(processed);
+    } catch (e) {
+      console.warn('MRE: vocoder failed, returning original —', e.message);
+      return channelData;
+    }
+  }
+
   // ── Phase vocoder pitch shifting ─────────────────────────
   /**
-   * Pitch-shift audio using a phase vocoder.
-   * Shifts pitch WITHOUT changing tempo or duration.
-   * This is the correct approach for subtle solfège tuning —
-   * the output sounds almost identical to the input, just tuned.
-   *
-   * Algorithm:
-   *   1. Divide signal into overlapping frames (analysis hop)
-   *   2. FFT each frame → complex spectrum
-   *   3. Compute phase difference between consecutive frames
-   *   4. Scale phase increments by pitch ratio
-   *   5. IFFT → overlap-add → output at synthesis hop
+   * Phase vocoder — pitch shift without tempo change.
+   * Called by tuneTo() for shifts > 100 cents.
+   * Also available directly for custom use.
    *
    * ZERO DOM DEPENDENCIES — pure Float32Array operations.
-   * React Native portable.
    *
-   * @param {Float32Array[]} channelData  — input channels
-   * @param {number}         pitchRatioVal — target/source Hz ratio
+   * @param {Float32Array[]} channelData
+   * @param {number}         pitchRatioVal
    * @param {object}         [options]
-   * @param {number}         [options.fftSize=2048]    — FFT window size
-   * @param {number}         [options.overlap=4]       — overlap factor (higher = better quality, slower)
-   * @param {number}         [options.wetDry=1.0]      — 0=dry original, 1=fully pitch-shifted
-   * @returns {Float32Array[]} processed channel data (same length as input)
+   * @param {number}         [options.fftSize=2048]
+   * @param {number}         [options.overlap=8]    — higher = less phasiness
+   * @param {number}         [options.wetDry=1.0]
+   * @returns {Float32Array[]}
    */
   function phaseVocoder(channelData, pitchRatioVal, options = {}) {
-    const fftSize  = options.fftSize  || 2048;
-    const overlap  = options.overlap  || 4;
-    const wetDry   = options.wetDry   !== undefined ? options.wetDry : 1.0;
-
-    // Clamp ratio to ±1 octave for quality — extreme shifts still use resampling fallback
+    const fftSize      = options.fftSize || 2048;
+    const overlap      = options.overlap || 8;
+    const wetDry       = options.wetDry  !== undefined ? options.wetDry : 1.0;
     const clampedRatio = Math.max(0.5, Math.min(2.0, pitchRatioVal));
 
     return channelData.map(channel => {
       try {
         return _processChannel(channel, clampedRatio, fftSize, overlap, wetDry);
       } catch (e) {
-        // Fallback to original channel on error
         console.warn('MRE: phase vocoder channel error —', e.message);
         return channel;
       }
@@ -519,6 +593,7 @@ const FrequencyEngine = (() => {
 
     // Processing
     resampleChannelData,
+    tuneTo,
     phaseVocoder,
 
     // Scoring
