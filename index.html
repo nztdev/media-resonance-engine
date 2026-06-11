@@ -215,6 +215,20 @@
           font-size:0.62rem;
         "></div>
 
+        <!-- Source tuning selector -->
+        <div style="margin-top:1rem">
+          <div class="freq-label" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Source Tuning</span>
+            <span style="color:var(--text-muted);font-size:0.58rem">What Hz is your file recorded at?</span>
+          </div>
+          <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap" id="sourceTuningGrid">
+            <button class="chip active" data-source="440" onclick="MREState.setSourceTuning(440)">440Hz · Standard</button>
+            <button class="chip" data-source="432" onclick="MREState.setSourceTuning(432)">432Hz · Natural</button>
+            <button class="chip" data-source="444" onclick="MREState.setSourceTuning(444)">444Hz · Crystal</button>
+            <button class="chip" data-source="auto" onclick="MREState.setSourceTuning('auto')">Auto-detect</button>
+          </div>
+        </div>
+
         <!-- Frequency selector -->
         <div class="freq-selector">
           <div class="freq-label">Target Resonance Frequency</div>

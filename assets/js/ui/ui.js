@@ -134,7 +134,7 @@ const ToastUI = (() => {
    * @param {string} message
    * @param {number} duration — ms, default 2800
    */
-  function show(message, duration = 2800) {
+  function show(message, duration = 4500) {
     const el     = _getEl();
     el.textContent = message;
     el.style.opacity = '1';

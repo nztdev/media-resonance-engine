@@ -23,6 +23,7 @@ const MREState = (() => {
     analysisData:      null,   // Real FFT analysis results (v0.5+)
     outputBuffer:      null,   // Processed channel data (v0.6+)
     outputSampleRate:  null,   // Sample rate of processed output
+    sourceTuning:      440,    // Declared source tuning Hz, or 'auto' (v0.7+)
     processed:         false,
     abMode:            'A',
     originalScores:    null,
@@ -80,6 +81,20 @@ const MREState = (() => {
     if (label) label.textContent = val + '%';
     OrbUI.updateIntensityRing(val);
     if (state.processed) _refreshWaveform();
+  }
+
+  // ── Source tuning ─────────────────────────────────────────
+  function setSourceTuning(value) {
+    state.sourceTuning = value; // number (Hz) or 'auto'
+
+    document.querySelectorAll('#sourceTuningGrid .chip').forEach(c => {
+      c.classList.toggle('active', String(c.dataset.source) === String(value));
+    });
+
+    const label = value === 'auto'
+      ? 'Auto-detect · FFT analysis will determine source Hz'
+      : `Source set to ${value}Hz · shift will be calculated from this`;
+    ToastUI.show(label, 3500);
   }
 
   // ── File loaded ───────────────────────────────────────────
@@ -231,23 +246,35 @@ const MREState = (() => {
     }
 
     // ── Stage 2: Hybrid tuning engine ──
-    if (state.fileData?.type === 'audio' && state.fileData?.channelData && fundamentalHz) {
+    if (state.fileData?.type === 'audio' && state.fileData?.channelData) {
       try {
-        const shiftCents = Math.abs(FrequencyEngine.centsDelta(fundamentalHz, state.selectedHz));
+        // ── Determine source Hz ────────────────────────────────
+        // If user declared a source tuning, use it.
+        // 'auto' falls back to FFT-detected fundamental.
+        // Default 440Hz covers virtually all modern recorded music.
+        let fromHz;
+        if (state.sourceTuning === 'auto') {
+          fromHz = fundamentalHz || 440;
+        } else {
+          fromHz = state.sourceTuning || 440;
+        }
+
+        const shiftCents = Math.abs(FrequencyEngine.centsDelta(fromHz, state.selectedHz));
         const method     = shiftCents <= 100 ? 'resampling' : 'phase vocoder';
-        _updateStage(`Tuning ${Math.round(fundamentalHz)}Hz → ${state.selectedHz}Hz via ${method}...`);
+
+        _updateStage(`Tuning ${fromHz}Hz → ${state.selectedHz}Hz · ${Math.round(shiftCents)}¢ · ${method}...`);
 
         const wetDry  = state.intensity / 100;
         const shifted = FrequencyEngine.tuneTo(
           state.fileData.channelData,
-          fundamentalHz,
+          fromHz,
           state.selectedHz,
           wetDry
         );
 
         state.outputBuffer     = shifted;
         state.outputSampleRate = state.fileData.sampleRate;
-        ToastUI.show(`Tuned to ${state.selectedHz}Hz · ${method} · WAV ready`);
+        ToastUI.show(`Tuned ${fromHz}Hz → ${state.selectedHz}Hz · ${Math.round(shiftCents)}¢ shift · ${method} · WAV ready`, 4000);
       } catch (err) {
         console.warn('MRE: tuning error —', err.message);
         state.outputBuffer     = null;
@@ -657,6 +684,7 @@ const MREState = (() => {
     setFrequency,
     setMediaType,
     setIntensity,
+    setSourceTuning,
     onFileLoaded,
     startProcessing,
     setABMode,
