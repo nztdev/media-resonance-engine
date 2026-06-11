@@ -5,7 +5,7 @@
  * Core functions are called here. UI is updated from here.
  * Neither core nor UI know about each other directly.
  *
- * v0.6 · https://github.com/[your-username]/media-resonance-engine
+ * v0.7 · https://github.com/[your-username]/media-resonance-engine
  */
 
 const MREState = (() => {
@@ -230,25 +230,41 @@ const MREState = (() => {
       baseScores = { harmonic: 52, coherence: 48, clarity: 61, alignment: 38 };
     }
 
-    // ── Stage 2: Real pitch shifting ──
+    // ── Stage 2: Phase vocoder pitch shifting ──
     if (state.fileData?.type === 'audio' && state.fileData?.channelData && fundamentalHz) {
       try {
-        _updateStage(`Shifting pitch from ${Math.round(fundamentalHz)}Hz to ${state.selectedHz}Hz...`);
-        const ratio  = FrequencyEngine.pitchRatio(fundamentalHz, state.selectedHz);
-        // Clamp ratio to ±2 octaves to avoid extreme artifacts
-        const clampedRatio = Math.max(0.25, Math.min(4.0, ratio));
-        const result = FrequencyEngine.resampleChannelData(
+        _updateStage(`Tuning from ${Math.round(fundamentalHz)}Hz → ${state.selectedHz}Hz...`);
+        const ratio    = FrequencyEngine.pitchRatio(fundamentalHz, state.selectedHz);
+        const wetDry   = state.intensity / 100;
+
+        // Use phase vocoder for subtle, tempo-preserving pitch shift
+        // Falls back gracefully if ratio is extreme (> ±1 octave handled internally)
+        const shifted = FrequencyEngine.phaseVocoder(
           state.fileData.channelData,
-          state.fileData.sampleRate,
-          clampedRatio
+          ratio,
+          { fftSize: 2048, overlap: 4, wetDry }
         );
-        state.outputBuffer      = result.channelData;
-        state.outputSampleRate  = state.fileData.sampleRate; // keep original rate — resampling shifts pitch via length change
-        ToastUI.show(`Pitch shifted · ratio ${clampedRatio.toFixed(3)} · WAV ready to download`);
+
+        state.outputBuffer     = shifted;
+        state.outputSampleRate = state.fileData.sampleRate;
+        ToastUI.show(`Tuned to ${state.selectedHz}Hz · tempo preserved · WAV ready`);
       } catch (err) {
-        console.warn('MRE: pitch shift error —', err.message);
-        state.outputBuffer     = null;
-        state.outputSampleRate = null;
+        console.warn('MRE: phase vocoder error —', err.message);
+        // Graceful fallback to resampling
+        try {
+          const ratio  = FrequencyEngine.pitchRatio(fundamentalHz, state.selectedHz);
+          const result = FrequencyEngine.resampleChannelData(
+            state.fileData.channelData,
+            state.fileData.sampleRate,
+            Math.max(0.25, Math.min(4.0, ratio))
+          );
+          state.outputBuffer     = result.channelData;
+          state.outputSampleRate = state.fileData.sampleRate;
+          ToastUI.show(`Tuned to ${state.selectedHz}Hz · WAV ready`);
+        } catch (e) {
+          state.outputBuffer     = null;
+          state.outputSampleRate = null;
+        }
       }
     }
 
@@ -587,45 +603,6 @@ const MREState = (() => {
     a.download = `mre-report-${state.selectedHz}hz-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }
-  
-// ── Download WAV ──────────────────────────────────────────
-  function downloadWAV() {
-    if (!state.outputBuffer || !state.outputSampleRate) {
-      ToastUI.show('No audio output available — process an audio file first');
-      return;
-    }
-    const baseName = state.fileName.replace(/\.[^.]+$/, '');
-    const filename = `${baseName}_${state.selectedHz}hz_mre.wav`;
-    AudioEncoderUI.downloadWAV(state.outputBuffer, state.outputSampleRate, filename);
-    ToastUI.show(`Downloading ${filename}`);
-  }
-
-  // ── Preview tuned output ──────────────────────────────────
-  let _previewCtx = null;
-  function previewTuned() {
-    if (!state.outputBuffer || !state.outputSampleRate) {
-      ToastUI.show('No audio output available — process an audio file first');
-      return;
-    }
-    if (_previewCtx) {
-      try { _previewCtx.close(); } catch(e) {}
-      _previewCtx = null;
-      const btn = document.getElementById('dlPreview');
-      if (btn) btn.textContent = '▶ Preview';
-      return;
-    }
-    const btn = document.getElementById('dlPreview');
-    if (btn) btn.textContent = '■ Stop';
-    ToastUI.show(`Previewing ${state.selectedHz}Hz aligned output...`);
-    _previewCtx = AudioEncoderUI.preview(
-      state.outputBuffer,
-      state.outputSampleRate,
-      () => {
-        _previewCtx = null;
-        if (btn) btn.textContent = '▶ Preview';
-      }
-    );
   }
 
   // ── Reveal on scroll ──────────────────────────────────────

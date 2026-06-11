@@ -4,7 +4,7 @@
  * Entry point. Loads data, binds events, initialises all systems.
  * Runs after all other scripts are loaded.
  *
- * v0.3 · https://github.com/nztdev/media-resonance-engine
+ * v0.7 · https://github.com/nztdev/media-resonance-engine
  */
 
 (async function init() {
@@ -135,7 +135,7 @@
 
   // ── Console signature ─────────────────────────────────────
   console.log(
-    '%c Media Resonance Engine · v0.6 ',
+    '%c Media Resonance Engine · v0.7 ',
     'background:#C9A96E;color:#0A0906;font-family:monospace;font-size:11px;padding:4px 8px;border-radius:2px;'
   );
   console.log(

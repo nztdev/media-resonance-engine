@@ -6,7 +6,7 @@
  * This file is React Native portable — copy to packages/core unchanged.
  *
  * Exports: FrequencyEngine
- * v0.6 · https://github.com/[your-username]/media-resonance-engine
+ * v0.7 · https://github.com/[your-username]/media-resonance-engine
  */
 
 const FrequencyEngine = (() => {
@@ -249,6 +249,203 @@ const FrequencyEngine = (() => {
     return { channelData: result, newSampleRate };
   }
 
+  // ── Phase vocoder pitch shifting ─────────────────────────
+  /**
+   * Pitch-shift audio using a phase vocoder.
+   * Shifts pitch WITHOUT changing tempo or duration.
+   * This is the correct approach for subtle solfège tuning —
+   * the output sounds almost identical to the input, just tuned.
+   *
+   * Algorithm:
+   *   1. Divide signal into overlapping frames (analysis hop)
+   *   2. FFT each frame → complex spectrum
+   *   3. Compute phase difference between consecutive frames
+   *   4. Scale phase increments by pitch ratio
+   *   5. IFFT → overlap-add → output at synthesis hop
+   *
+   * ZERO DOM DEPENDENCIES — pure Float32Array operations.
+   * React Native portable.
+   *
+   * @param {Float32Array[]} channelData  — input channels
+   * @param {number}         pitchRatioVal — target/source Hz ratio
+   * @param {object}         [options]
+   * @param {number}         [options.fftSize=2048]    — FFT window size
+   * @param {number}         [options.overlap=4]       — overlap factor (higher = better quality, slower)
+   * @param {number}         [options.wetDry=1.0]      — 0=dry original, 1=fully pitch-shifted
+   * @returns {Float32Array[]} processed channel data (same length as input)
+   */
+  function phaseVocoder(channelData, pitchRatioVal, options = {}) {
+    const fftSize  = options.fftSize  || 2048;
+    const overlap  = options.overlap  || 4;
+    const wetDry   = options.wetDry   !== undefined ? options.wetDry : 1.0;
+
+    // Clamp ratio to ±1 octave for quality — extreme shifts still use resampling fallback
+    const clampedRatio = Math.max(0.5, Math.min(2.0, pitchRatioVal));
+
+    return channelData.map(channel => {
+      try {
+        return _processChannel(channel, clampedRatio, fftSize, overlap, wetDry);
+      } catch (e) {
+        // Fallback to original channel on error
+        console.warn('MRE: phase vocoder channel error —', e.message);
+        return channel;
+      }
+    });
+  }
+
+  function _processChannel(channel, ratio, fftSize, overlap, wetDry) {
+    const hopA      = Math.floor(fftSize / overlap);  // analysis hop
+    const hopS      = Math.floor(hopA * ratio);        // synthesis hop (scaled)
+    const numFrames = Math.floor((channel.length - fftSize) / hopA) + 1;
+    const output    = new Float32Array(channel.length + fftSize);
+    const window    = _makeHannWindow(fftSize);
+
+    // Phase accumulators
+    const phaseAcc  = new Float32Array(fftSize / 2 + 1);
+    const lastPhase = new Float32Array(fftSize / 2 + 1);
+
+    // Expected phase advance per analysis hop per bin
+    const expectedPhaseAdv = new Float32Array(fftSize / 2 + 1);
+    for (let k = 0; k < fftSize / 2 + 1; k++) {
+      expectedPhaseAdv[k] = (2 * Math.PI * k * hopA) / fftSize;
+    }
+
+    for (let frame = 0; frame < numFrames; frame++) {
+      const inputPos = frame * hopA;
+
+      // ── Windowed frame ──
+      const re = new Float32Array(fftSize);
+      const im = new Float32Array(fftSize);
+      for (let i = 0; i < fftSize; i++) {
+        const sampleIdx = inputPos + i;
+        re[i] = sampleIdx < channel.length
+          ? channel[sampleIdx] * window[i]
+          : 0;
+      }
+
+      // ── FFT ──
+      _fft(re, im, false);
+
+      // ── Phase processing ──
+      const mag    = new Float32Array(fftSize / 2 + 1);
+      const phase  = new Float32Array(fftSize / 2 + 1);
+
+      for (let k = 0; k <= fftSize / 2; k++) {
+        mag[k]   = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
+        phase[k] = Math.atan2(im[k], re[k]);
+
+        // True frequency via phase difference
+        let dp    = phase[k] - lastPhase[k] - expectedPhaseAdv[k];
+        // Wrap to [-π, π]
+        dp -= 2 * Math.PI * Math.round(dp / (2 * Math.PI));
+
+        // Accumulate scaled phase
+        phaseAcc[k]  += expectedPhaseAdv[k] / hopA * hopS + dp / hopA * hopS;
+        lastPhase[k]  = phase[k];
+      }
+
+      // ── Reconstruct spectrum with new phases ──
+      const reOut = new Float32Array(fftSize);
+      const imOut = new Float32Array(fftSize);
+      for (let k = 0; k <= fftSize / 2; k++) {
+        reOut[k] = mag[k] * Math.cos(phaseAcc[k]);
+        imOut[k] = mag[k] * Math.sin(phaseAcc[k]);
+        // Mirror for IFFT
+        if (k > 0 && k < fftSize / 2) {
+          reOut[fftSize - k] =  reOut[k];
+          imOut[fftSize - k] = -imOut[k];
+        }
+      }
+
+      // ── IFFT ──
+      _fft(reOut, imOut, true);
+
+      // ── Overlap-add into output ──
+      const outputPos = frame * hopS;
+      for (let i = 0; i < fftSize; i++) {
+        if (outputPos + i < output.length) {
+          output[outputPos + i] += reOut[i] * window[i];
+        }
+      }
+    }
+
+    // ── Normalise output level to match input ──
+    const inRMS  = _rms(channel);
+    const outRMS = _rms(output.subarray(0, channel.length));
+    const gain   = outRMS > 0.0001 ? inRMS / outRMS : 1;
+
+    const result = new Float32Array(channel.length);
+    for (let i = 0; i < channel.length; i++) {
+      const dry = channel[i];
+      const wet = output[i] * gain;
+      result[i] = dry * (1 - wetDry) + wet * wetDry;
+    }
+
+    return result;
+  }
+
+  // ── Cooley-Tukey FFT (in-place, radix-2) ─────────────────
+  /**
+   * In-place FFT / IFFT on real + imaginary arrays.
+   * Pure JS implementation — no Web Audio API dependency.
+   * @param {Float32Array} re     — real parts (modified in place)
+   * @param {Float32Array} im     — imaginary parts (modified in place)
+   * @param {boolean}      inverse — true for IFFT
+   */
+  function _fft(re, im, inverse) {
+    const n = re.length;
+    // Bit-reversal permutation
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) {
+        [re[i], re[j]] = [re[j], re[i]];
+        [im[i], im[j]] = [im[j], im[i]];
+      }
+    }
+    // Butterfly operations
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang  = 2 * Math.PI / len * (inverse ? 1 : -1);
+      const wRe  = Math.cos(ang);
+      const wIm  = Math.sin(ang);
+      for (let i = 0; i < n; i += len) {
+        let curRe = 1, curIm = 0;
+        for (let j = 0; j < len / 2; j++) {
+          const uRe = re[i + j];
+          const uIm = im[i + j];
+          const vRe = re[i + j + len/2] * curRe - im[i + j + len/2] * curIm;
+          const vIm = re[i + j + len/2] * curIm + im[i + j + len/2] * curRe;
+          re[i + j]         = uRe + vRe;
+          im[i + j]         = uIm + vIm;
+          re[i + j + len/2] = uRe - vRe;
+          im[i + j + len/2] = uIm - vIm;
+          [curRe, curIm] = [curRe * wRe - curIm * wIm, curRe * wIm + curIm * wRe];
+        }
+      }
+    }
+    if (inverse) {
+      for (let i = 0; i < n; i++) {
+        re[i] /= n;
+        im[i] /= n;
+      }
+    }
+  }
+
+  function _makeHannWindow(size) {
+    const w = new Float32Array(size);
+    for (let i = 0; i < size; i++) {
+      w[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (size - 1)));
+    }
+    return w;
+  }
+
+  function _rms(arr) {
+    let sum = 0;
+    for (let i = 0; i < arr.length; i++) sum += arr[i] * arr[i];
+    return Math.sqrt(sum / arr.length);
+  }
+
   // ── Alignment score ───────────────────────────────────────
   /**
    * Calculate how closely aligned a frequency is to a target.
@@ -315,6 +512,7 @@ const FrequencyEngine = (() => {
 
     // Processing
     resampleChannelData,
+    phaseVocoder,
 
     // Scoring
     alignmentScore,
